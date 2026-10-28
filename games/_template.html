@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b1d">
+  <title>Game Template — Nova Arcade</title>
+  <!--
+    ======================================================================
+    NOVA ARCADE — GAME TEMPLATE
+    ======================================================================
+    Copy this file to games/<your-game>.html, then:
+
+      1. Change the config in Arcade.createGame({...}) below (id, title…).
+      2. Write your game in start / update / render / input.
+      3. Register it in assets/core.js → `games` array so it shows on the
+         hub:  { id:'mygame', title:'My Game', path:'games/mygame.html',
+                 tier:'free', status:'live', tagline:'…', tags:['Arcade'] }
+
+    You get all of this for free from assets/game-shell.js:
+      • Top bar with back button, HUD, pause, music, settings, fullscreen, login
+      • Menu screen with your options, 3-2-1 countdown, pause, game-over
+        screen with count-up score, new-record confetti, and stats
+      • Keyboard (arrows / WASD / space), swipe + tap, on-screen D-pad on phones
+      • Fixed 120 Hz update loop, hi-DPI canvas scaled to fit any screen
+      • Saved high scores, device leaderboard, recent runs, play time
+      • Particles, floating text, screen shake, screen flash, synth SFX
+      • Animated backgrounds + music from the user's settings
+
+    THE `g` OBJECT (passed to every hook)
+      g.W, g.H              logical canvas size (draw in these units)
+      g.state               'menu' | 'countdown' | 'playing' | 'paused' | 'dying' | 'over'
+      g.score               current score (use g.addScore to change it)
+      g.time                seconds played this run
+      g.options             the player's chosen options, e.g. g.options.difficulty
+      g.keys                Set of held actions: 'up','down','left','right','action'
+      g.data                scratch object, cleared each run — store your state here
+      g.addScore(n, x, y, color)       add points (+ optional floating "+n")
+      g.hud.set(key, value, bump, hot) update a HUD chip you declared in `hud`
+      g.over({ title, sound, delay })  end the run (shows game-over screen)
+      g.sfx(name)            click hover toggle eat coin power combo die start
+                             pause resume levelup record error whoosh tick
+      g.particles.burst(x, y, { count, color, speed, life, size, gravity })
+      g.floatText(text, x, y, { color, size, life })
+      g.shake(magnitude, seconds)       g.flash(color, seconds)
+      g.isPro()             true if the player has the Pro plan
+    ======================================================================
+  -->
+  <link rel="stylesheet" href="../assets/core.css">
+  <link rel="stylesheet" href="../assets/game.css">
+</head>
+<body>
+  <script src="../assets/core.js"></script>
+  <script src="../assets/game-shell.js"></script>
+  <script>
+  /* Example game: "Orb Rush" — steer, grab orbs, dodge the red mines. */
+  Arcade.createGame({
+    id: 'template',                    // unique, used for saving scores/options
+    title: 'Orb Rush (template)',
+    tagline: 'Template example',
+    instructions: 'Grab the glowing orbs. Avoid the red mines.',
+    tier: 'free',                      // 'free' | 'pro'
+    width: 800, height: 600,           // logical size; shell scales to fit
+
+    /* Shown on the menu screen. `pro: true` choices are locked for free users. */
+    options: [
+      { key: 'difficulty', label: 'Difficulty', default: 'normal', choices: [
+        { value: 'chill', label: 'Chill' },
+        { value: 'normal', label: 'Normal' },
+        { value: 'insane', label: 'Insane', pro: true }
+      ] }
+    ],
+
+    /* Extra HUD chips (score + best are added automatically) */
+    hud: [{ key: 'lives', label: 'Lives' }],
+
+    /* Listed in the side panel. Pause/restart/music/fullscreen are added for you. */
+    controls: [['Arrows / WASD', 'Move'], ['Swipe / D-pad', 'Move (touch)']],
+
+    /* Optional one-time setup (load images, build lookup tables, etc.) */
+    init(g) {},
+
+    /* Reset everything for a fresh run. Also called once for the menu backdrop. */
+    start(g) {
+      const d = g.data;
+      d.p = { x: g.W / 2, y: g.H / 2, vx: 0, vy: 0, r: 14 };
+      d.orb = spawn(g);
+      d.mines = [];
+      d.lives = 3;
+      d.speed = { chill: 0.7, normal: 1, insane: 1.5 }[g.options.difficulty] || 1;
+      d.inv = 0;   // invulnerability timer
+      g.hud.set('lives', d.lives);
+    },
+
+    /* Fixed timestep (dt = 1/120 s). Only runs while playing. */
+    update(g, dt) {
+      const d = g.data, p = d.p, acc = 1400 * d.speed;
+      if (g.keys.has('left')) p.vx -= acc * dt;
+      if (g.keys.has('right')) p.vx += acc * dt;
+      if (g.keys.has('up')) p.vy -= acc * dt;
+      if (g.keys.has('down')) p.vy += acc * dt;
+      p.vx *= 1 - 3 * dt; p.vy *= 1 - 3 * dt;
+      p.x = Math.max(p.r, Math.min(g.W - p.r, p.x + p.vx * dt));
+      p.y = Math.max(p.r, Math.min(g.H - p.r, p.y + p.vy * dt));
+      d.inv = Math.max(0, d.inv - dt);
+
+      if (dist(p, d.orb) < p.r + d.orb.r) {
+        g.addScore(10, d.orb.x, d.orb.y, '#67e8f9');
+        g.sfx('eat');
+        g.particles.burst(d.orb.x, d.orb.y, { count: 20, color: ['#67e8f9', '#a78bfa'] });
+        d.orb = spawn(g);
+        if (g.score % 30 === 0) d.mines.push(Object.assign(spawn(g), { vx: (Math.random() - .5) * 200 * d.speed, vy: (Math.random() - .5) * 200 * d.speed, r: 12 }));
+      }
+      d.mines.forEach((m) => {
+        m.x += m.vx * dt; m.y += m.vy * dt;
+        if (m.x < m.r || m.x > g.W - m.r) m.vx *= -1;
+        if (m.y < m.r || m.y > g.H - m.r) m.vy *= -1;
+        if (!d.inv && dist(p, m) < p.r + m.r) {
+          d.lives--; d.inv = 1.5; g.hud.set('lives', d.lives, true, d.lives === 1);
+          g.shake(12); g.flash('#f43f5e'); g.sfx('error');
+          g.particles.burst(p.x, p.y, { count: 30, color: '#f43f5e', speed: 260 });
+          if (d.lives <= 0) g.over({ title: 'Out of lives' });
+        }
+      });
+    },
+
+    /* Called every animation frame in every state. Draw in logical units. */
+    render(g, ctx) {
+      const d = g.data, t = performance.now() / 1000;
+      ctx.fillStyle = '#0a0a1c'; ctx.fillRect(0, 0, g.W, g.H);
+      ctx.strokeStyle = 'rgba(167,139,250,.08)';
+      for (let x = 0; x < g.W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, g.H); ctx.stroke(); }
+      for (let y = 0; y < g.H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(g.W, y); ctx.stroke(); }
+      glow(ctx, d.orb.x, d.orb.y, d.orb.r + Math.sin(t * 5) * 2, '#67e8f9');
+      d.mines.forEach((m) => glow(ctx, m.x, m.y, m.r, '#f43f5e'));
+      if (!(d.inv && Math.floor(t * 12) % 2)) glow(ctx, d.p.x, d.p.y, d.p.r, '#a78bfa');
+    },
+
+    /* Discrete input events: 'up' 'down' 'left' 'right' 'action'. Optional. */
+    input(g, action) {},
+
+    /* Extra stats on the game-over screen. Optional. */
+    summary(g) { return [{ label: 'Mines', value: g.data.mines.length }]; }
+  });
+
+  function spawn(g) { return { x: 40 + Math.random() * (g.W - 80), y: 40 + Math.random() * (g.H - 80), r: 10 }; }
+  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+  function glow(ctx, x, y, r, col) {
+    ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = 20; ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  }
+  </script>
+</body>
+</html>

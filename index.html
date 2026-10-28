@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b1d">
+  <meta name="description" content="Nova Arcade — free browser games with a neon twist. No downloads, saved high scores, custom backgrounds and an original soundtrack.">
+  <title>Nova Arcade — Free browser games</title>
+  <link rel="stylesheet" href="assets/core.css">
+  <style>
+    /* ---------- Nav ---------- */
+    .nav { position: sticky; top: 0; z-index: 100; transition: background .3s, border-color .3s, backdrop-filter .3s; border-bottom: 1px solid transparent; }
+    .nav.is-scrolled { background: rgba(11,11,29,.72); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-color: var(--border); }
+    .nav-inner { display: flex; align-items: center; gap: 20px; height: 72px; }
+    .logo { display: flex; align-items: center; gap: 10px; color: var(--fg); font-family: var(--font-display); font-size: 20px; letter-spacing: .04em; }
+    .logo-mark { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: linear-gradient(135deg, var(--primary), var(--accent)); box-shadow: 0 6px 20px -6px var(--primary-glow); }
+    .logo-mark svg { width: 22px; height: 22px; color: #fff; }
+    .logo b { color: var(--primary-2); font-weight: 400; }
+    .nav-links { display: flex; gap: 4px; margin-left: 12px; }
+    .nav-links a { padding: 10px 14px; border-radius: 10px; color: var(--fg-dim); font-weight: 600; transition: color .2s, background .2s; }
+    .nav-links a:hover { color: var(--fg); background: rgba(255,255,255,.05); }
+    .nav-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+    /* ---------- Hero ---------- */
+    .hero { padding: 56px 0 72px; }
+    .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: center; }
+    .hero h1 { font-size: clamp(44px, 7vw, 84px); line-height: 1.02; letter-spacing: -.01em; margin: 18px 0 20px; }
+    .grad { background: linear-gradient(100deg, var(--primary-2) 0%, var(--accent-2) 45%, #fcd34d 90%); -webkit-background-clip: text; background-clip: text; color: transparent; background-size: 200% auto; animation: grad-move 6s ease-in-out infinite alternate; }
+    @keyframes grad-move { to { background-position: 100% center; } }
+    .hero-sub { font-size: 19px; color: var(--fg-dim); max-width: 48ch; }
+    .hero-cta { display: flex; gap: 12px; margin-top: 32px; flex-wrap: wrap; }
+    .hero-feats { display: flex; gap: 18px; margin-top: 36px; flex-wrap: wrap; color: var(--fg-dim); font-size: 14px; font-weight: 600; }
+    .hero-feats span { display: inline-flex; align-items: center; gap: 8px; }
+    .hero-feats svg { width: 18px; height: 18px; color: var(--primary-2); }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 0 rgba(52,211,153,.6); animation: ping 2s infinite; }
+    @keyframes ping { 70% { box-shadow: 0 0 0 10px rgba(52,211,153,0); } 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); } }
+
+    .showcase { position: relative; perspective: 1200px; }
+    .showcase-card {
+      position: relative; border-radius: 28px; padding: 14px; transform-style: preserve-3d;
+      transform: rotateY(-12deg) rotateX(6deg); transition: transform .5s var(--ease-out);
+      background: linear-gradient(160deg, rgba(60,50,110,.6), rgba(20,18,40,.8));
+      border: 1px solid var(--border-strong);
+      box-shadow: 0 50px 100px -30px rgba(0,0,0,.8), 0 0 100px -30px var(--primary-glow);
+    }
+    .showcase-card canvas { width: 100%; aspect-ratio: 1; border-radius: 18px; background: #07071a; }
+    .showcase-label { display: flex; align-items: center; justify-content: space-between; padding: 14px 6px 4px; }
+    .showcase-label h3 { font-size: 20px; }
+    .float-badge {
+      position: absolute; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 16px;
+      background: rgba(30,28,53,.9); border: 1px solid var(--border-strong); box-shadow: var(--shadow); backdrop-filter: blur(10px);
+      font-weight: 600; font-size: 14px; animation: float 6s ease-in-out infinite; transform: translateZ(60px);
+    }
+    .float-badge svg { width: 22px; height: 22px; }
+    .float-badge small { display: block; color: var(--fg-faint); font-size: 12px; font-weight: 600; }
+    .fb-1 { top: 8%; left: -36px; } .fb-1 svg { color: #fcd34d; }
+    .fb-2 { bottom: 18%; right: -28px; animation-delay: -3s; } .fb-2 svg { color: var(--accent-2); }
+    @keyframes float { 50% { translate: 0 -12px; } }
+
+    /* ---------- Games ---------- */
+    .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .search { position: relative; }
+    .search svg { position: absolute; left: 14px; top: 50%; translate: 0 -50%; width: 18px; height: 18px; color: var(--fg-faint); pointer-events: none; }
+    .search .input { padding-left: 42px; width: 240px; min-height: 42px; border-radius: 999px; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .game-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 22px; }
+    .game-card {
+      position: relative; display: flex; flex-direction: column; border-radius: 22px; overflow: hidden; color: var(--fg);
+      background: var(--card); border: 1px solid var(--border); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      transition: transform .35s var(--ease-out), box-shadow .35s var(--ease-out), border-color .3s;
+      transform-style: preserve-3d; will-change: transform;
+    }
+    .game-card:hover { border-color: var(--border-strong); box-shadow: 0 30px 60px -25px rgba(0,0,0,.8), 0 0 50px -20px hsl(var(--h) 90% 60% / .6); }
+    .game-card .thumb { position: relative; aspect-ratio: 16/10; overflow: hidden; background: #07071a; }
+    .game-card .thumb canvas { width: 100%; height: 100%; transition: transform .6s var(--ease-out), filter .3s; }
+    .game-card:hover .thumb canvas { transform: scale(1.06); }
+    .game-card.is-soon .thumb canvas { filter: saturate(.55) brightness(.7); }
+    .game-card .thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 50%, rgba(11,11,29,.85)); }
+    .thumb-badges { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; z-index: 2; }
+    .thumb-badges .badge { background-color: rgba(11,11,29,.78); backdrop-filter: blur(6px); }
+    .play-fab {
+      position: absolute; right: 16px; bottom: -22px; z-index: 3; width: 56px; height: 56px; border-radius: 50%;
+      display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      box-shadow: 0 10px 30px -8px var(--primary-glow); transform: scale(.85); opacity: 0;
+      transition: transform .35s var(--ease-spring), opacity .25s;
+    }
+    .play-fab svg { width: 22px; height: 22px; margin-left: 3px; }
+    .game-card:hover .play-fab, .game-card:focus-visible .play-fab { transform: none; opacity: 1; }
+    .game-card .body { padding: 18px 20px 20px; display: grid; gap: 8px; flex: 1; }
+    .game-card h3 { font-size: 22px; }
+    .game-card p { color: var(--fg-dim); font-size: 15px; }
+    .game-card .meta { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 10px; font-size: 14px; color: var(--fg-faint); }
+    .game-card .meta b { color: var(--fg); }
+    .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,.06); color: var(--fg-dim); }
+    .game-card.is-soon { cursor: default; }
+    .empty-state { grid-column: 1/-1; text-align: center; padding: 48px; color: var(--fg-dim); }
+
+    /* ---------- Features ---------- */
+    .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .feat { padding: 26px; border-radius: 20px; transition: transform .3s var(--ease-out), border-color .3s; }
+    .feat:hover { transform: translateY(-4px); border-color: var(--border-strong); }
+    .feat-ico { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; margin-bottom: 16px; background: linear-gradient(135deg, rgba(139,92,246,.25), rgba(244,63,94,.2)); border: 1px solid var(--border); }
+    .feat-ico svg { width: 24px; height: 24px; color: var(--primary-2); }
+    .feat h3 { font-size: 19px; margin-bottom: 8px; }
+    .feat p { color: var(--fg-dim); font-size: 15px; }
+
+    /* ---------- Plans ---------- */
+    .plans { display: grid; grid-template-columns: repeat(2, minmax(0, 420px)); gap: 22px; justify-content: center; }
+    .plan { padding: 32px; border-radius: 24px; display: flex; flex-direction: column; gap: 18px; position: relative; }
+    .plan h3 { font-size: 26px; }
+    .plan .price { font-family: var(--font-display); font-size: 44px; line-height: 1; }
+    .plan .price small { font-family: var(--font-ui); font-size: 15px; color: var(--fg-faint); }
+    .plan ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+    .plan li { display: flex; gap: 10px; align-items: flex-start; color: var(--fg-dim); }
+    .plan li svg { width: 18px; height: 18px; flex: none; margin-top: 3px; color: var(--success); }
+    .plan .btn { margin-top: auto; }
+    .plan-pro { border: 1px solid rgba(251,191,36,.35); background: linear-gradient(170deg, rgba(80,40,90,.55), rgba(30,28,53,.75)); }
+    .plan-pro::before { content: ''; position: absolute; inset: -1px; border-radius: 24px; padding: 1px; background: linear-gradient(135deg, #fbbf24, #f43f5e, var(--primary)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; opacity: .7; pointer-events: none; }
+    .plan-pro li svg { color: #fcd34d; }
+    .current-plan { position: absolute; top: 20px; right: 20px; }
+
+    /* ---------- Leaderboard ---------- */
+    .lb-wrap { padding: 28px; border-radius: 24px; display: grid; grid-template-columns: 260px 1fr; gap: 28px; }
+    .lb-tabs { display: grid; gap: 6px; align-content: start; }
+    .lb-tab { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border-radius: 12px; border: 1px solid transparent; background: transparent; cursor: pointer; font-weight: 600; color: var(--fg-dim); text-align: left; }
+    .lb-tab[aria-selected='true'] { background: rgba(139,92,246,.15); color: var(--fg); border-color: var(--border); }
+    .lb-tab .dot { width: 10px; height: 10px; border-radius: 3px; }
+    .lb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .lb-list li { display: grid; grid-template-columns: 40px 40px 1fr auto; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 14px; background: rgba(0,0,0,.22); animation: row-in .5s var(--ease-out) backwards; }
+    .lb-list li.me { outline: 1px solid var(--border-strong); background: rgba(139,92,246,.12); }
+    @keyframes row-in { from { opacity: 0; transform: translateX(-10px); } }
+    .lb-rank { font-family: var(--font-display); font-size: 20px; color: var(--fg-faint); text-align: center; }
+    .lb-list li:nth-child(1) .lb-rank { color: #fcd34d; } .lb-list li:nth-child(2) .lb-rank { color: #cbd5e1; } .lb-list li:nth-child(3) .lb-rank { color: #f59e0b; }
+    .lb-list .avatar { width: 36px; height: 36px; font-size: 14px; border-radius: 10px; }
+    .lb-score { font-family: var(--font-display); font-size: 20px; font-variant-numeric: tabular-nums; }
+
+    /* ---------- CTA + footer ---------- */
+    .cta-band { padding: 56px; border-radius: 28px; text-align: center; display: grid; gap: 16px; justify-items: center; background: linear-gradient(135deg, rgba(139,92,246,.35), rgba(244,63,94,.25)); border: 1px solid var(--border-strong); overflow: hidden; position: relative; }
+    .cta-band h2 { font-size: clamp(30px, 4.5vw, 48px); }
+    .cta-band p { color: var(--fg-dim); max-width: 50ch; }
+    footer { padding: 40px 0 56px; color: var(--fg-faint); font-size: 14px; }
+    .foot { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--border); padding-top: 28px; }
+    .foot a { color: var(--fg-dim); } .foot a:hover { color: var(--fg); }
+
+    @media (max-width: 960px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .showcase { max-width: 460px; margin-inline: auto; width: 100%; }
+      .showcase-card { transform: none; }
+      .fb-1 { left: -8px; } .fb-2 { right: -8px; }
+      .feat-grid { grid-template-columns: 1fr 1fr; }
+      .plans { grid-template-columns: 1fr; }
+      .lb-wrap { grid-template-columns: 1fr; }
+      .lb-tabs { grid-auto-flow: column; overflow-x: auto; }
+      .nav-links { display: none; }
+    }
+    @media (max-width: 600px) {
+      .section { padding: 64px 0; }
+      .feat-grid { grid-template-columns: 1fr; }
+      .search .input { width: 100%; }
+      .search { flex: 1 1 100%; }
+      .cta-band { padding: 36px 20px; }
+      .nav-right .hide-sm { display: none; }
+      .hero { padding-top: 28px; }
+      .hero-cta .btn { flex: 1; }
+    }
+  </style>
+</head>
+<body>
+  <a href="#games" class="sr-only">Skip to games</a>
+
+  <header class="nav" id="nav">
+    <div class="container nav-inner">
+      <a href="#" class="logo" aria-label="Nova Arcade home"><span class="logo-mark" id="logo-mark"></span>NOVA <b>ARCADE</b></a>
+      <nav class="nav-links" aria-label="Main">
+        <a href="#games">Games</a><a href="#features">Features</a><a href="#plans">Plans</a><a href="#leaderboard">Leaderboard</a>
+      </nav>
+      <div class="nav-right">
+        <button class="icon-btn" id="btn-music"></button>
+        <button class="icon-btn" id="btn-settings" aria-label="Settings"></button>
+        <div id="account-slot"></div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- HERO -->
+    <section class="hero">
+      <div class="container hero-grid">
+        <div>
+          <span class="badge reveal"><span class="live-dot"></span>Free to play · No downloads</span>
+          <h1 class="reveal">Play. Glow.<br><span class="grad">Repeat.</span></h1>
+          <p class="hero-sub reveal" id="hero-sub">Hand-crafted arcade games that run right in your browser. Chase high scores, unlock skins, and make the whole place look the way you like.</p>
+          <div class="hero-cta reveal" id="hero-cta"></div>
+          <div class="hero-feats reveal" id="hero-feats"></div>
+        </div>
+        <div class="showcase reveal" id="showcase">
+          <div class="showcase-card" id="showcase-card">
+            <canvas id="showcase-canvas" width="600" height="600" aria-label="Neon Snake preview" role="img"></canvas>
+            <div class="showcase-label"><div><span class="eyebrow">Featured</span><h3>Neon Snake</h3></div><a class="btn btn-primary" href="games/snake.html" id="showcase-play"></a></div>
+          </div>
+          <div class="float-badge fb-1" id="fb-best"></div>
+          <div class="float-badge fb-2" id="fb-combo"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GAMES -->
+    <section class="section" id="games" style="padding-top:32px">
+      <div class="container">
+        <div class="section-head reveal">
+          <div><span class="eyebrow">Library</span><h2 class="section-title">Pick a game</h2></div>
+          <div class="toolbar">
+            <label class="search"><span class="sr-only">Search games</span><span id="search-ico"></span><input class="input" id="search" type="search" placeholder="Search games" autocomplete="off"></label>
+            <div class="chips" id="filters" role="group" aria-label="Filter games"></div>
+          </div>
+        </div>
+        <div class="game-grid" id="game-grid"></div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-head reveal"><div><span class="eyebrow">Why Nova</span><h2 class="section-title">More than a game list</h2><p class="section-sub">Everything here is built to feel good: fast loads, crisp visuals, and little details that make you want one more run.</p></div></div>
+        <div class="feat-grid" id="feat-grid"></div>
+      </div>
+    </section>
+
+    <!-- PLANS -->
+    <section class="section" id="plans">
+      <div class="container">
+        <div class="section-head reveal" style="justify-content:center;text-align:center"><div><span class="eyebrow">Plans</span><h2 class="section-title">Free forever. Pro when you want more.</h2><p class="section-sub" style="margin-inline:auto">Start playing right now. Pro adds premium games and cosmetics once it launches.</p></div></div>
+        <div class="plans" id="plans-grid"></div>
+      </div>
+    </section>
+
+    <!-- LEADERBOARD -->
+    <section class="section" id="leaderboard">
+      <div class="container">
+        <div class="section-head reveal"><div><span class="eyebrow">Hall of fame</span><h2 class="section-title">Leaderboard</h2><p class="section-sub">Top scores from every profile on this device. Global boards arrive with cloud accounts.</p></div></div>
+        <div class="lb-wrap glass reveal">
+          <div class="lb-tabs" id="lb-tabs" role="tablist" aria-label="Choose a game"></div>
+          <div id="lb-body" role="tabpanel"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="section" style="padding-top:24px">
+      <div class="container"><div class="cta-band reveal" id="cta-band"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container foot">
+      <span>© <span id="year"></span> Nova Arcade. Made for fun.</span>
+      <span style="display:flex;gap:18px"><a href="#games">Games</a><a href="#plans">Plans</a><a href="#" id="foot-settings">Settings</a></span>
+    </div>
+  </footer>
+
+  <script src="assets/core.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const A = Arcade, icon = A.icon, esc = A.esc, $ = (s) => document.querySelector(s);
+
+    /* ---------- Static icons ---------- */
+    $('#logo-mark').innerHTML = icon('gamepad');
+    $('#btn-settings').innerHTML = icon('settings');
+    $('#search-ico').outerHTML = icon('search');
+    $('#year').textContent = new Date().getFullYear();
+    A.ui.bindMusicButton($('#btn-music'));
+    $('#btn-settings').addEventListener('click', A.ui.openSettings);
+    $('#foot-settings').addEventListener('click', (e) => { e.preventDefault(); A.ui.openSettings(); });
+    $('#showcase-play').innerHTML = icon('play') + 'Play';
+
+    $('#hero-feats').innerHTML = [['cloud', 'Saved progress'], ['music', 'Original music'], ['image', 'Custom backgrounds'], ['phone', 'Touch ready']]
+      .map(([i, t]) => '<span>' + icon(i) + t + '</span>').join('');
+
+    /* ---------- Account-aware UI ---------- */
+    function paintAccount() {
+      const u = A.auth.current(), slot = $('#account-slot');
+      if (!u) {
+        slot.innerHTML = '<div style="display:flex;gap:8px"><button class="btn btn-ghost hide-sm" data-auth="login">Log in</button><button class="btn btn-primary" data-auth="signup">' + icon('user') + 'Sign up free</button></div>';
+        slot.querySelectorAll('[data-auth]').forEach((b) => b.addEventListener('click', () => A.ui.openAuth(b.dataset.auth)));
+      } else {
+        slot.innerHTML = '<div class="dropdown" id="acct-dd"><button class="avatar" style="border:0;cursor:pointer;background:linear-gradient(135deg,hsl(' + u.hue + ',80%,60%),hsl(' + (u.hue + 60) + ',80%,55%))" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu">' + esc(u.username[0].toUpperCase()) + '</button>' +
+          '<div class="dropdown-menu" role="menu"><div class="dropdown-head"><b>' + esc(u.username) + '</b><div style="margin-top:6px"><span class="badge ' + (u.plan === 'pro' ? 'badge-pro' : 'badge-free') + '">' + (u.plan === 'pro' ? 'Pro' : 'Free plan') + '</span></div></div>' +
+          '<button class="dropdown-item" role="menuitem" data-act="profile">' + icon('user') + 'Profile &amp; stats</button>' +
+          '<button class="dropdown-item" role="menuitem" data-act="settings">' + icon('settings') + 'Settings</button>' +
+          (u.plan !== 'pro' ? '<button class="dropdown-item" role="menuitem" data-act="upgrade">' + icon('crown') + 'Upgrade to Pro</button>' : '') +
+          '<button class="dropdown-item" role="menuitem" data-act="logout">' + icon('logout') + 'Log out</button></div></div>';
+        const dd = $('#acct-dd'), btn = dd.querySelector('.avatar');
+        btn.addEventListener('click', (e) => { e.stopPropagation(); const open = !dd.classList.contains('is-open'); dd.classList.toggle('is-open', open); btn.setAttribute('aria-expanded', open); });
+        document.addEventListener('click', () => { dd.classList.remove('is-open'); btn.setAttribute('aria-expanded', 'false'); });
+        dd.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => {
+          const a = b.dataset.act;
+          if (a === 'profile') A.ui.openProfile();
+          if (a === 'settings') A.ui.openSettings();
+          if (a === 'upgrade') A.ui.openUpgrade();
+          if (a === 'logout') { A.auth.logOut(); A.ui.toast('Logged out. See you soon!', 'logout'); }
+        }));
+      }
+      // hero
+      const best = A.scores.best('snake');
+      $('#hero-cta').innerHTML = '<a class="btn btn-primary btn-lg" href="games/snake.html">' + icon('play') + (u ? 'Jump back in' : 'Play Neon Snake') + '</a>' +
+        (u ? '<button class="btn btn-lg" id="hero-2">' + icon('chart') + 'Your stats</button>' : '<button class="btn btn-lg" id="hero-2">' + icon('user') + 'Create free account</button>');
+      $('#hero-2').addEventListener('click', () => (u ? A.ui.openProfile() : A.ui.openAuth('signup')));
+      if (u) $('#hero-sub').textContent = 'Welcome back, ' + u.username + '. Your scores, skins and settings are right where you left them.';
+      $('#fb-best').innerHTML = icon('trophy') + '<div><small>Your best</small>' + (best ? best.toLocaleString() : 'Set one!') + '</div>';
+      $('#fb-combo').innerHTML = icon('flame') + '<div><small>Combo chains</small>Up to x8</div>';
+      // CTA band
+      $('#cta-band').innerHTML = u
+        ? '<h2>Ready for another run?</h2><p>Your personal best in Neon Snake is <b>' + best.toLocaleString() + '</b>. Go beat it.</p><a class="btn btn-primary btn-lg" href="games/snake.html">' + icon('play') + 'Play now</a>'
+        : '<h2>Make it yours</h2><p>A free account keeps your high scores, stats and settings on a profile. Takes ten seconds.</p><div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center"><button class="btn btn-primary btn-lg" id="cta-join">' + icon('user') + 'Create free account</button><a class="btn btn-lg" href="games/snake.html">' + icon('play') + 'Play as guest</a></div>';
+      const cj = $('#cta-join'); if (cj) cj.addEventListener('click', () => A.ui.openAuth('signup'));
+      paintPlans(); paintGames(); paintLB();
+    }
+    A.on('auth', paintAccount);
+    A.on('score', paintAccount);
+
+    /* ---------- Games grid ---------- */
+    const FILTERS = ['All', 'Free', 'Pro', 'Arcade', 'Puzzle', 'Shooter'];
+    let filter = 'All', query = '';
+    $('#filters').innerHTML = FILTERS.map((f) => '<button class="chip" data-f="' + f + '" aria-pressed="' + (f === filter) + '">' + f + '</button>').join('');
+    $('#filters').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-f]'); if (!b) return;
+      filter = b.dataset.f; document.querySelectorAll('#filters .chip').forEach((c) => c.setAttribute('aria-pressed', String(c === b))); paintGames();
+    });
+    $('#search').addEventListener('input', (e) => { query = e.target.value.trim().toLowerCase(); paintGames(); });
+
+    const thumbs = new Map();
+    function paintGames() {
+      thumbs.forEach((t) => t.stop()); thumbs.clear();
+      const list = A.games.filter((g) => {
+        if (filter === 'Free' && g.tier !== 'free') return false;
+        if (filter === 'Pro' && g.tier !== 'pro') return false;
+        if (!['All', 'Free', 'Pro'].includes(filter) && !g.tags.includes(filter)) return false;
+        return !query || (g.title + ' ' + g.tagline + ' ' + g.tags.join(' ')).toLowerCase().includes(query);
+      });
+      const grid = $('#game-grid');
+      if (!list.length) { grid.innerHTML = '<div class="empty-state">' + icon('search').replace('<svg', '<svg width="32" height="32" style="margin:0 auto 10px"') + 'No games match that. Try another filter.</div>'; return; }
+      grid.innerHTML = list.map((g, i) => {
+        const live = g.status === 'live', best = A.scores.best(g.id), plays = A.scores.get(g.id).plays;
+        const tierB = g.tier === 'pro' ? '<span class="badge badge-pro">' + icon('crown') + 'Pro</span>' : '<span class="badge badge-free">Free</span>';
+        const statusB = live ? '' : '<span class="badge">' + icon(g.tier === 'pro' ? 'lock' : 'clock') + 'Coming soon</span>';
+        const tag = live ? 'a href="' + g.path + '"' : 'div';
+        return '<' + tag + ' class="game-card reveal ' + (live ? '' : 'is-soon') + '" style="--h:' + g.hue + ';transition-delay:' + i * 60 + 'ms" data-id="' + g.id + '"' + (live ? ' aria-label="Play ' + esc(g.title) + '"' : ' aria-disabled="true"') + '>' +
+          '<div class="thumb"><canvas width="540" height="338" aria-hidden="true"></canvas><div class="thumb-badges">' + tierB + statusB + '</div>' + (live ? '<span class="play-fab" aria-hidden="true">' + icon('play') + '</span>' : '') + '</div>' +
+          '<div class="body"><h3>' + esc(g.title) + '</h3><p>' + esc(g.tagline) + '</p><div class="tags">' + g.tags.map((t) => '<span class="tag">' + esc(t) + '</span>').join('') + '</div>' +
+          '<div class="meta">' + (live ? '<span>' + icon('trophy').replace('<svg', '<svg width="14" height="14" style="display:inline;vertical-align:-2px"') + ' Best <b>' + best.toLocaleString() + '</b></span><span>' + plays + ' plays</span>' : '<span>' + (g.tier === 'pro' ? 'Included with Pro' : 'Free when it launches') + '</span>') + '</div></div>' +
+          '</' + (live ? 'a' : 'div') + '>';
+      }).join('');
+      grid.querySelectorAll('.game-card').forEach((card) => {
+        const g = A.games.find((x) => x.id === card.dataset.id);
+        const th = startThumb(card.querySelector('canvas'), g.thumb, g.hue); thumbs.set(card, th);
+        tilt(card, 6);
+        if (g.status !== 'live') card.addEventListener('click', () => { if (g.tier === 'pro') A.ui.openUpgrade(g.title + ' will be part of Pro.'); else A.ui.toast(g.title + ' is in the works — check back soon!', 'clock'); });
+        reveal(card);
+      });
+    }
+
+    /* ---------- Thumbnail animations ---------- */
+    const THUMBS = {
+      snake(c, w, h, t, s) {
+        const n = 20, cs = w / n, rows = Math.floor(h / cs);
+        if (!s.body) { s.body = [[6, 5], [5, 5], [4, 5], [3, 5], [2, 5]]; s.dir = [1, 0]; s.food = [14, 8]; s.acc = 0; }
+        s.acc += s.dt;
+        if (s.acc > 0.11) {
+          s.acc = 0; const hd = s.body[0];
+          const want = [Math.sign(s.food[0] - hd[0]), Math.sign(s.food[1] - hd[1])];
+          if (want[0] && want[0] !== -s.dir[0]) s.dir = [want[0], 0]; else if (want[1] && want[1] !== -s.dir[1]) s.dir = [0, want[1]];
+          const nh = [(hd[0] + s.dir[0] + n) % n, (hd[1] + s.dir[1] + rows) % rows];
+          s.body.unshift(nh);
+          if (nh[0] === s.food[0] && nh[1] === s.food[1]) { s.food = [(Math.random() * n) | 0, (Math.random() * rows) | 0]; if (s.body.length > 26) s.body.length = 6; } else s.body.pop();
+        }
+        c.fillStyle = '#07071a'; c.fillRect(0, 0, w, h);
+        c.fillStyle = 'rgba(167,139,250,.06)'; for (let y = 0; y < rows; y++) for (let x = 0; x < n; x++) if ((x + y) % 2) c.fillRect(x * cs, y * cs, cs, cs);
+        c.shadowColor = '#fb7185'; c.shadowBlur = 16; c.fillStyle = '#fb7185'; c.beginPath(); c.arc(s.food[0] * cs + cs / 2, s.food[1] * cs + cs / 2, cs * 0.32, 0, 7); c.fill();
+        c.shadowColor = '#34d399'; c.lineCap = 'round';
+        s.body.forEach((p, i) => {
+          if (i && Math.abs(p[0] - s.body[i - 1][0]) + Math.abs(p[1] - s.body[i - 1][1]) > 1) return;
+          const k = i / s.body.length; c.fillStyle = 'hsl(' + (150 + k * 45) + ',95%,' + (62 - k * 18) + '%)';
+          c.shadowBlur = i ? 0 : 14; c.beginPath(); c.arc(p[0] * cs + cs / 2, p[1] * cs + cs / 2, cs * (i ? 0.42 - k * 0.12 : 0.48), 0, 7); c.fill();
+          if (i) { const q = s.body[i - 1]; c.strokeStyle = c.fillStyle; c.lineWidth = cs * (0.8 - k * 0.24); c.beginPath(); c.moveTo(p[0] * cs + cs / 2, p[1] * cs + cs / 2); c.lineTo(q[0] * cs + cs / 2, q[1] * cs + cs / 2); c.stroke(); }
+        });
+        c.shadowBlur = 0;
+      },
+      blocks(c, w, h, t, s) {
+        const cs = h / 12, cols = Math.floor(w / cs);
+        if (!s.pieces) s.pieces = Array.from({ length: 7 }, (_, i) => ({ x: (i * 3) % cols, y: -Math.random() * 12, hue: [190, 280, 50, 330, 140, 20, 220][i], sh: i % 4, sp: 2 + Math.random() * 2 }));
+        c.fillStyle = '#07071a'; c.fillRect(0, 0, w, h);
+        const SH = [[[0, 0], [1, 0], [2, 0], [3, 0]], [[0, 0], [1, 0], [0, 1], [1, 1]], [[0, 0], [1, 0], [2, 0], [1, 1]], [[0, 0], [0, 1], [1, 1], [2, 1]]];
+        for (let y = 9; y < 12; y++) for (let x = 0; x < cols; x++) if ((x * 7 + y * 3) % 5) block(c, x * cs, y * cs, cs, 'hsl(' + ((x * 30 + y * 50) % 360) + ',80%,55%)', 0.45);
+        s.pieces.forEach((p) => {
+          p.y += p.sp * s.dt; if (p.y > 9) { p.y = -3; p.x = (Math.random() * (cols - 3)) | 0; }
+          SH[p.sh].forEach(([dx, dy]) => block(c, (p.x + dx) * cs, (Math.floor(p.y) + dy) * cs, cs, 'hsl(' + p.hue + ',90%,60%)', 1));
+        });
+      },
+      void(c, w, h, t, s) {
+        if (!s.rocks) { s.rocks = Array.from({ length: 7 }, () => ({ x: Math.random() * w, y: Math.random() * h, vx: (Math.random() - .5) * 40, vy: (Math.random() - .5) * 40, r: 14 + Math.random() * 26, a: Math.random() * 6, pts: Array.from({ length: 9 }, () => 0.7 + Math.random() * 0.3) })); s.shots = []; s.cd = 0; }
+        c.fillStyle = 'rgba(7,7,26,1)'; c.fillRect(0, 0, w, h);
+        for (let i = 0; i < 60; i++) { c.fillStyle = 'rgba(255,255,255,' + (0.2 + (i % 5) / 8) + ')'; c.fillRect((i * 97) % w, (i * 53) % h, 1.5, 1.5); }
+        c.lineWidth = 2; c.strokeStyle = '#c4b5fd'; c.shadowColor = '#8b5cf6'; c.shadowBlur = 10;
+        s.rocks.forEach((r) => {
+          r.x = (r.x + r.vx * s.dt + w) % w; r.y = (r.y + r.vy * s.dt + h) % h; r.a += s.dt * 0.4;
+          c.beginPath(); r.pts.forEach((k, i) => { const a = r.a + i / r.pts.length * Math.PI * 2; c.lineTo(r.x + Math.cos(a) * r.r * k, r.y + Math.sin(a) * r.r * k); }); c.closePath(); c.stroke();
+        });
+        const sa = t * 0.8, sx = w / 2, sy = h / 2;
+        s.cd -= s.dt; if (s.cd < 0) { s.cd = 0.25; s.shots.push({ x: sx, y: sy, vx: Math.cos(sa) * 300, vy: Math.sin(sa) * 300, l: 1 }); }
+        c.strokeStyle = '#f472b6'; c.shadowColor = '#f43f5e';
+        s.shots = s.shots.filter((p) => (p.l -= s.dt) > 0); s.shots.forEach((p) => { p.x += p.vx * s.dt; p.y += p.vy * s.dt; c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03); c.stroke(); });
+        c.strokeStyle = '#fff'; c.save(); c.translate(sx, sy); c.rotate(sa); c.beginPath(); c.moveTo(16, 0); c.lineTo(-10, -10); c.lineTo(-5, 0); c.lineTo(-10, 10); c.closePath(); c.stroke(); c.restore();
+        c.shadowBlur = 0;
+      },
+      pong(c, w, h, t, s) {
+        if (!s.b) s.b = { x: w / 2, y: h / 2, vx: 260, vy: 170 };
+        const b = s.b; b.x += b.vx * s.dt; b.y += b.vy * s.dt;
+        if (b.y < 10 || b.y > h - 10) b.vy *= -1;
+        if (b.x < 30 || b.x > w - 30) b.vx *= -1;
+        c.fillStyle = '#07071a'; c.fillRect(0, 0, w, h);
+        c.setLineDash([8, 10]); c.strokeStyle = 'rgba(255,255,255,.15)'; c.beginPath(); c.moveTo(w / 2, 0); c.lineTo(w / 2, h); c.stroke(); c.setLineDash([]);
+        c.shadowBlur = 18; c.shadowColor = '#22d3ee'; c.fillStyle = '#67e8f9'; c.fillRect(16, Math.max(10, Math.min(h - 80, b.y - 35)), 10, 70);
+        c.shadowColor = '#f43f5e'; c.fillStyle = '#fb7185'; c.fillRect(w - 26, Math.max(10, Math.min(h - 80, b.y - 35 + Math.sin(t * 3) * 20)), 10, 70);
+        c.shadowColor = '#fff'; c.fillStyle = '#fff'; c.beginPath(); c.arc(b.x, b.y, 8, 0, 7); c.fill(); c.shadowBlur = 0;
+        c.font = '48px "Russo One"'; c.fillStyle = 'rgba(255,255,255,.12)'; c.textAlign = 'center'; c.fillText('3', w * 0.3, 70); c.fillText('2', w * 0.7, 70);
+      },
+      bricks(c, w, h, t, s) {
+        c.fillStyle = '#07071a'; c.fillRect(0, 0, w, h);
+        const cols = 9, bw = w / cols;
+        for (let y = 0; y < 5; y++) for (let x = 0; x < cols; x++) if ((x + y + Math.floor(t)) % 7) block(c, x * bw + 3, 24 + y * 24, bw - 6, 'hsl(' + (y * 30 + 10) + ',90%,58%)', 1, 18);
+        const bx = w / 2 + Math.sin(t * 1.7) * w * 0.35, by = h * 0.62 + Math.cos(t * 2.3) * h * 0.18;
+        c.shadowBlur = 16; c.shadowColor = '#fbbf24'; c.fillStyle = '#fde68a'; c.beginPath(); c.arc(bx, by, 7, 0, 7); c.fill();
+        c.shadowColor = '#a78bfa'; c.fillStyle = '#a78bfa'; c.fillRect(bx - 45, h - 26, 90, 10); c.shadowBlur = 0;
+      },
+      default(c, w, h) { c.fillStyle = '#07071a'; c.fillRect(0, 0, w, h); }
+    };
+    function block(c, x, y, s, col, a, hh) { c.globalAlpha = a; c.fillStyle = col; c.fillRect(x + 1, y + 1, s - 2, (hh || s) - 2); c.fillStyle = 'rgba(255,255,255,.25)'; c.fillRect(x + 1, y + 1, s - 2, 3); c.globalAlpha = 1; }
+
+    function startThumb(canvas, kind, hue) {
+      const ctx = canvas.getContext('2d'), fn = THUMBS[kind] || THUMBS.default, s = {};
+      let raf = 0, last = 0, t = Math.random() * 10, visible = false, alive = true;
+      const draw = (now) => {
+        if (!alive) return;
+        s.dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016; last = now; t += s.dt;
+        fn(ctx, canvas.width, canvas.height, t, s);
+        if (visible && !A.settings.reducedMotion()) raf = requestAnimationFrame(draw); else last = 0;
+      };
+      const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); } });
+      io.observe(canvas);
+      draw(performance.now());
+      return { stop() { alive = false; cancelAnimationFrame(raf); io.disconnect(); } };
+    }
+
+    /* Hero showcase reuses the snake thumbnail at a bigger size */
+    startThumb($('#showcase-canvas'), 'snake');
+    const card = $('#showcase-card');
+    if (matchMedia('(min-width: 961px)').matches) {
+      $('#showcase').addEventListener('pointermove', (e) => {
+        if (A.settings.reducedMotion()) return;
+        const r = e.currentTarget.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+        card.style.transform = 'rotateY(' + (x * 18 - 6) + 'deg) rotateX(' + (-y * 14 + 4) + 'deg)';
+      });
+      $('#showcase').addEventListener('pointerleave', () => (card.style.transform = ''));
+    }
+
+    function tilt(el, max) {
+      el.addEventListener('pointermove', (e) => {
+        if (e.pointerType !== 'mouse' || A.settings.reducedMotion()) return;
+        const r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+        el.style.transform = 'perspective(900px) rotateY(' + x * max + 'deg) rotateX(' + -y * max + 'deg) translateY(-6px)';
+      });
+      el.addEventListener('pointerleave', () => (el.style.transform = ''));
+    }
+
+    /* ---------- Features ---------- */
+    $('#feat-grid').innerHTML = [
+      ['cloud', 'Your progress, saved', 'High scores, stats, recent runs and options are saved to your profile automatically.'],
+      ['image', 'Living backgrounds', 'Pick from animated presets like Synthwave, Warp Speed and Aurora — or upload your own image.'],
+      ['music', 'A soundtrack that’s never the same', 'Three original tracks generated live in your browser, plus punchy sound effects.'],
+      ['palette', 'Skins & themes', 'Recolor the whole arcade, add CRT scanlines, and unlock skins in every game.'],
+      ['zap', 'Power-ups & combos', 'Every game is tuned for that “one more run” feeling, with juicy feedback on every hit.'],
+      ['phone', 'Plays anywhere', 'Keyboard, swipe or on-screen D-pad. Fullscreen on desktop, comfy on phones.']
+    ].map(([i, t, d], k) => '<div class="feat glass reveal" style="transition-delay:' + k * 60 + 'ms"><div class="feat-ico">' + icon(i) + '</div><h3>' + t + '</h3><p>' + d + '</p></div>').join('');
+
+    /* ---------- Plans ---------- */
+    function paintPlans() {
+      const u = A.auth.current(), pro = A.config.pro;
+      const li = (t) => '<li>' + icon('check') + '<span>' + esc(t) + '</span></li>';
+      $('#plans-grid').innerHTML =
+        '<div class="plan glass reveal">' + (u && u.plan !== 'pro' ? '<span class="badge badge-free current-plan">Your plan</span>' : '') +
+        '<span class="eyebrow">Free</span><h3>Player</h3><div class="price">$0 <small>forever</small></div>' +
+        '<ul>' + ['All free games, unlimited plays', 'Profiles with saved high scores & stats', 'Animated backgrounds & custom images', 'Music, sound effects and accent themes', 'Device leaderboards'].map(li).join('') + '</ul>' +
+        (u ? '<a class="btn btn-lg btn-block" href="#games">' + icon('play') + 'Keep playing</a>' : '<button class="btn btn-primary btn-lg btn-block" data-join>' + icon('user') + 'Create free account</button>') + '</div>' +
+        '<div class="plan plan-pro reveal" style="transition-delay:80ms"><div style="display:flex;gap:8px"><span class="badge badge-pro">' + icon('crown') + 'Pro</span>' + (!pro.available ? '<span class="badge">Coming soon</span>' : '') + '</div>' +
+        '<h3>Pro Player</h3><div class="price">' + esc(pro.priceLabel) + '</div>' +
+        '<ul>' + ['Everything in Free'].concat(pro.perks).map(li).join('') + '</ul>' +
+        '<button class="btn btn-accent btn-lg btn-block" data-pro>' + icon(pro.available ? 'crown' : 'bell') + (pro.available ? 'Upgrade to Pro' : 'Get notified') + '</button></div>';
+      const j = document.querySelector('[data-join]'); if (j) j.addEventListener('click', () => A.ui.openAuth('signup'));
+      document.querySelector('[data-pro]').addEventListener('click', () => A.ui.openUpgrade());
+      document.querySelectorAll('#plans-grid .reveal').forEach(reveal);
+    }
+
+    /* ---------- Leaderboard ---------- */
+    let lbGame = 'snake';
+    function paintLB() {
+      const live = A.games.filter((g) => g.status === 'live');
+      $('#lb-tabs').innerHTML = live.map((g) => '<button class="lb-tab" role="tab" aria-selected="' + (g.id === lbGame) + '" data-g="' + g.id + '"><span class="dot" style="background:hsl(' + g.hue + ',85%,55%)"></span>' + esc(g.title) + '</button>').join('');
+      $('#lb-tabs').querySelectorAll('[data-g]').forEach((b) => b.addEventListener('click', () => { lbGame = b.dataset.g; paintLB(); }));
+      const rows = A.scores.leaderboard(lbGame, 10), g = A.games.find((x) => x.id === lbGame);
+      $('#lb-body').innerHTML = rows.length
+        ? '<ol class="lb-list">' + rows.map((r, i) => '<li class="' + (r.me ? 'me' : '') + '" style="animation-delay:' + i * 50 + 'ms"><span class="lb-rank">' + (i + 1) + '</span><span class="avatar" style="background:linear-gradient(135deg,hsl(' + r.hue + ',80%,60%),hsl(' + (r.hue + 60) + ',80%,55%))">' + esc(r.name[0].toUpperCase()) + '</span><span><b>' + esc(r.name) + '</b>' + (r.me ? ' <span class="badge" style="margin-left:6px">You</span>' : '') + '<div class="field-hint">' + r.plays + ' plays</div></span><span class="lb-score">' + r.best.toLocaleString() + '</span></li>').join('') + '</ol>'
+        : '<div class="empty-state" style="padding:32px">' + icon('trophy').replace('<svg', '<svg width="40" height="40" style="margin:0 auto 12px;color:#fcd34d"') + '<p style="margin-bottom:16px">No scores yet for ' + esc(g.title) + '. The top spot is wide open.</p><a class="btn btn-primary" href="' + g.path + '">' + icon('play') + 'Claim it</a></div>';
+    }
+
+    /* ---------- Nav + reveal ---------- */
+    const nav = $('#nav');
+    addEventListener('scroll', () => nav.classList.toggle('is-scrolled', scrollY > 10), { passive: true });
+    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { const t = e.target; t.classList.add('is-in'); io.unobserve(t); setTimeout(() => (t.style.transitionDelay = ''), 900); } }), { threshold: 0.12 });
+    function reveal(el) { io.observe(el); }
+    document.querySelectorAll('.reveal').forEach(reveal);
+
+    paintAccount();
+  })();
+  </script>
+</body>
+</html>

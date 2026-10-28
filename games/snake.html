@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b1d">
+  <meta name="description" content="Neon Snake — classic snake with power-ups, combos, skins and modes.">
+  <title>Neon Snake — Nova Arcade</title>
+  <link rel="stylesheet" href="../assets/core.css">
+  <link rel="stylesheet" href="../assets/game.css">
+</head>
+<body>
+  <script src="../assets/core.js"></script>
+  <script src="../assets/game-shell.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const N = 24;              // grid cells per side
+    const SIZE = 720;          // logical canvas size
+    const C = SIZE / N;        // cell size
+    const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+    const OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
+    const key = (x, y) => x + ',' + y;
+    let boardCache = null, boardMode = null;
+
+    /* ---------- Skins ---------- */
+    const SKINS = {
+      neon:    { color: (k) => 'hsl(' + (150 + k * 45) + ',95%,' + (62 - k * 18) + '%)', glow: '#34d399', eye: '#04140c' },
+      aurora:  { color: (k) => 'hsl(' + (265 + k * 70) + ',90%,' + (68 - k * 16) + '%)', glow: '#a78bfa', eye: '#14051f' },
+      ember:   { color: (k) => 'hsl(' + (48 - k * 48) + ',100%,' + (60 - k * 14) + '%)', glow: '#fb923c', eye: '#1f0a02' },
+      ghost:   { color: (k) => 'rgba(226,232,255,' + (0.95 - k * 0.65) + ')', glow: '#e0e7ff', eye: '#111827' },
+      rainbow: { color: (k, t) => 'hsl(' + ((k * 360 + t * 120) % 360) + ',95%,62%)', glow: '#f472b6', eye: '#111' },
+      galaxy:  { color: (k, t) => 'hsl(' + (250 + Math.sin(k * 10 + t * 2) * 30) + ',70%,' + (30 + Math.sin(k * 25 + t * 3) * 12) + '%)', glow: '#818cf8', eye: '#fff', sparkle: true }
+    };
+
+    /* ---------- Power-ups ---------- */
+    const POWERS = {
+      slow:   { label: 'Slow-mo', color: '#22d3ee', dur: 6 },
+      ghost:  { label: 'Ghost',   color: '#e0e7ff', dur: 6 },
+      double: { label: 'x2 Points', color: '#fbbf24', dur: 8 },
+      shrink: { label: 'Shrink',  color: '#c084fc', dur: 0 }
+    };
+
+    const MAZE = (() => {
+      const w = new Set(); const add = (x, y) => w.add(x + ',' + y);
+      for (let i = 4; i < 10; i++) { add(i, 6); add(N - 1 - i, N - 7); }
+      for (let i = 4; i < 10; i++) { add(N - 7, i); add(6, N - 1 - i); }
+      for (let i = 10; i < 14; i++) { add(i, 11); add(i, 12); }
+      return w;
+    })();
+
+    const game = Arcade.createGame({
+      id: 'snake',
+      title: 'Neon Snake',
+      tagline: 'Arcade classic',
+      instructions: 'Eat, grow, chain combos. Don’t bite yourself.',
+      tier: 'free',
+      width: SIZE, height: SIZE,
+      hud: [{ key: 'combo', label: 'Combo' }, { key: 'len', label: 'Length' }],
+      controls: [['Arrows / WASD', 'Steer'], ['Swipe / D-pad', 'Steer (touch)']],
+      options: [
+        { key: 'mode', label: 'Mode', default: 'classic', choices: [
+          { value: 'classic', label: 'Classic', desc: 'Walls are deadly' },
+          { value: 'wrap', label: 'Portal', desc: 'Edges wrap around' },
+          { value: 'zen', label: 'Zen', desc: 'No game over — biting yourself trims your tail' },
+          { value: 'maze', label: 'Maze', desc: 'Navigate walls', pro: true }
+        ] },
+        { key: 'speed', label: 'Speed', default: 'normal', choices: [
+          { value: 'relaxed', label: 'Relaxed' }, { value: 'normal', label: 'Normal' }, { value: 'fast', label: 'Fast' }
+        ] },
+        { key: 'skin', label: 'Skin', default: 'neon', choices: [
+          { value: 'neon', label: 'Neon' }, { value: 'aurora', label: 'Aurora' }, { value: 'ember', label: 'Ember' },
+          { value: 'ghost', label: 'Ghost' }, { value: 'rainbow', label: 'Rainbow', pro: true }, { value: 'galaxy', label: 'Galaxy', pro: true }
+        ] }
+      ],
+
+      start(g) { reset(g, false); },
+
+      update(g, dt) { step(g, dt, false); },
+
+      /* Attract mode: an AI plays behind the menu */
+      animate(g, dt) {
+        const d = g.data;
+        if (g.state !== 'paused') d.clock = (d.clock || 0) + dt;
+        if (g.state === 'menu' && d.demo) step(g, dt, true);
+      },
+
+      updateDying(g, dt) {
+        const d = g.data;
+        d.dieT += dt;
+        // explode the body from head to tail
+        while (d.popped < d.body.length && d.dieT > d.popped * 0.02) {
+          const s = d.body[d.popped], k = d.popped / Math.max(1, d.body.length - 1);
+          g.particles.burst(cx(s[0]), cx(s[1]), { count: 6, color: [skin(g).color(k, d.clock), '#fff'], speed: 180, life: 0.6, size: 3.5 });
+          if (d.popped % 4 === 0) g.sfx('tick');
+          d.popped++;
+        }
+      },
+
+      input(g, action) {
+        if (!DIRS[action]) return;
+        const d = g.data, q = d.queue;
+        const lastDir = q.length ? q[q.length - 1] : d.dir;
+        if (action === lastDir || action === OPP[lastDir] || q.length >= 3) return;
+        q.push(action);
+      },
+
+      render(g, ctx) { draw(g, ctx); },
+
+      summary(g) {
+        const d = g.data;
+        return [{ label: 'Length', value: d.body.length }, { label: 'Max combo', value: 'x' + d.maxCombo }, { label: 'Boosts', value: d.powersTaken }];
+      },
+
+      onOptions(g) { reset(g, true); }
+    });
+    window.__snake = game; // handy for debugging in the console
+
+    /* ===================================================================== */
+    function skin(g) { return SKINS[g.options.skin] || SKINS.neon; }
+    function cx(v) { return v * C + C / 2; }
+
+    function reset(g, demo) {
+      const d = g.data;
+      const mid = Math.floor(N / 2);
+      d.body = [[mid, mid + 3], [mid, mid + 4], [mid, mid + 5], [mid, mid + 6]];
+      d.prev = d.body.map((s) => s.slice());
+      d.dir = 'up'; d.queue = [];
+      d.timer = 0; d.eaten = 0; d.grow = 0;
+      d.combo = 1; d.maxCombo = 1; d.lastEat = -99;
+      d.foods = []; d.powerItem = null; d.active = {}; d.powersTaken = 0;
+      d.dieT = 0; d.popped = 0; d.mouth = 0; d.blink = 3;
+      d.demo = true; // the AI only drives while the menu is showing
+      d.walls = g.options.mode === 'maze' ? MAZE : new Set();
+      spawnFood(g, 'apple');
+      g.hud.set('combo', 'x1', false, false);
+      g.hud.set('len', d.body.length);
+    }
+
+    function baseInterval(g) { return { relaxed: 0.14, normal: 0.105, fast: 0.075 }[g.options.speed] || 0.105; }
+    function interval(g) {
+      const d = g.data;
+      let t = Math.max(0.05, baseInterval(g) - d.eaten * 0.0007);
+      if (d.active.slow > 0) t *= 1.7;
+      return t;
+    }
+
+    function occupied(g, x, y) {
+      const d = g.data;
+      return d.walls.has(key(x, y)) || d.body.some((s) => s[0] === x && s[1] === y) || d.foods.some((f) => f.x === x && f.y === y) || (d.powerItem && d.powerItem.x === x && d.powerItem.y === y);
+    }
+    function freeCell(g) {
+      for (let i = 0; i < 500; i++) { const x = (Math.random() * N) | 0, y = (Math.random() * N) | 0; if (!occupied(g, x, y)) return [x, y]; }
+      return null;
+    }
+    function spawnFood(g, type) {
+      const c = freeCell(g); if (!c) return;
+      g.data.foods.push({ x: c[0], y: c[1], type, born: g.data.clock || 0, life: type === 'star' ? 6 : Infinity });
+    }
+
+    /* Advance the simulation (shared by real play and the demo AI) */
+    function step(g, dt, demo) {
+      const d = g.data;
+      for (const k in d.active) if (d.active[k] > 0) d.active[k] -= dt;
+      d.mouth = Math.max(0, d.mouth - dt * 4);
+      d.blink -= dt; if (d.blink < -0.12) d.blink = 2 + Math.random() * 3;
+      // expire star / power-up
+      d.foods = d.foods.filter((f) => f.type !== 'star' || (d.clock - f.born) < f.life);
+      if (d.powerItem && d.clock - d.powerItem.born > 8) d.powerItem = null;
+      if (!demo) {
+        const comboAlive = g.time - d.lastEat < 3.2;
+        if (!comboAlive && d.combo > 1) { d.combo = 1; g.hud.set('combo', 'x1', true, false); }
+      }
+
+      d.timer += dt;
+      const iv = interval(g);
+      if (d.timer < iv) return;
+      d.timer -= iv;
+
+      if (demo) aiSteer(g);
+      if (d.queue.length) d.dir = d.queue.shift();
+      const [dx, dy] = DIRS[d.dir];
+      let nx = d.body[0][0] + dx, ny = d.body[0][1] + dy;
+      const mode = g.options.mode;
+      const wraps = mode === 'wrap' || mode === 'zen' || demo;
+      if (nx < 0 || nx >= N || ny < 0 || ny >= N) {
+        if (wraps) { nx = (nx + N) % N; ny = (ny + N) % N; }
+        else return die(g, 'Hit the wall');
+      }
+      if (d.walls.has(key(nx, ny))) return demo ? reset(g, true) : die(g, 'Hit the wall');
+
+      // self collision (tail tip moves away this tick unless growing)
+      const bodyCheck = d.grow > 0 ? d.body : d.body.slice(0, -1);
+      const hitIdx = bodyCheck.findIndex((s) => s[0] === nx && s[1] === ny);
+      if (hitIdx >= 0 && !(d.active.ghost > 0)) {
+        if (demo) return reset(g, true);
+        if (mode === 'zen') {
+          const cut = d.body.splice(hitIdx);
+          cut.forEach((s, i) => g.particles.burst(cx(s[0]), cx(s[1]), { count: 4, color: skin(g).glow, speed: 120, life: 0.5 }));
+          g.sfx('error'); g.shake(6, 0.2); g.floatText('-' + cut.length, cx(nx), cx(ny), { color: '#f43f5e' });
+        } else return die(g, 'Bit yourself');
+      }
+
+      d.prev = d.body.map((s) => s.slice());
+      d.body.unshift([nx, ny]);
+      if (d.grow > 0) d.grow--; else d.body.pop();
+      if (d.prev.length < d.body.length) d.prev.push(d.prev[d.prev.length - 1].slice());
+
+      // food
+      const fi = d.foods.findIndex((f) => f.x === nx && f.y === ny);
+      if (fi >= 0) eat(g, d.foods.splice(fi, 1)[0], demo);
+      if (d.powerItem && d.powerItem.x === nx && d.powerItem.y === ny) takePower(g, demo);
+
+      // open mouth when food is ahead
+      const ahead = d.foods.some((f) => Math.abs(f.x - nx) + Math.abs(f.y - ny) <= 2);
+      if (ahead) d.mouth = 1;
+      if (!demo) g.hud.set('len', d.body.length);
+    }
+
+    function eat(g, f, demo) {
+      const d = g.data, x = cx(f.x), y = cx(f.y);
+      d.eaten++; d.grow += f.type === 'star' ? 3 : 1;
+      const col = f.type === 'star' ? '#fbbf24' : '#fb7185';
+      g.particles.burst(x, y, { count: f.type === 'star' ? 34 : 18, color: [col, '#fff', skin(g).glow], speed: f.type === 'star' ? 300 : 200, size: 3 });
+      if (demo) { if (f.type === 'apple') spawnFood(g, 'apple'); return; }
+      // combo
+      if (g.time - d.lastEat < 3.2) d.combo = Math.min(8, d.combo + 1); else d.combo = 1;
+      d.lastEat = g.time; d.maxCombo = Math.max(d.maxCombo, d.combo);
+      const mult = d.combo * (d.active.double > 0 ? 2 : 1);
+      const pts = (f.type === 'star' ? 50 : 10) * mult;
+      g.addScore(pts, x, y - 10, f.type === 'star' ? '#fcd34d' : '#fff');
+      g.hud.set('combo', 'x' + d.combo, d.combo > 1, d.combo >= 3);
+      if (f.type === 'star') { g.sfx('coin'); g.shake(5, 0.15); g.flash('#fbbf24', 0.08); }
+      else { g.sfx('eat'); if (d.combo > 1) g.sfx('combo', d.combo); }
+      if (d.combo === 5) { g.floatText('ON FIRE!', SIZE / 2, SIZE * 0.3, { color: '#fb923c', size: 36, life: 1.2 }); g.sfx('levelup'); }
+      if (d.eaten % 10 === 0) g.floatText('SPEED UP', SIZE / 2, SIZE * 0.42, { color: '#67e8f9', size: 26 });
+      if (f.type === 'apple') spawnFood(g, 'apple');
+      if (!d.foods.some((x) => x.type === 'star') && Math.random() < 0.14) spawnFood(g, 'star');
+      if (!d.powerItem && d.eaten > 2 && Math.random() < 0.13) {
+        const c = freeCell(g), types = Object.keys(POWERS);
+        if (c) d.powerItem = { x: c[0], y: c[1], type: types[(Math.random() * types.length) | 0], born: d.clock };
+      }
+    }
+
+    function takePower(g, demo) {
+      const d = g.data, p = d.powerItem, def = POWERS[p.type];
+      d.powerItem = null;
+      if (demo) return;
+      d.powersTaken++;
+      g.sfx('power'); g.flash(def.color, 0.12);
+      g.particles.burst(cx(p.x), cx(p.y), { count: 40, color: [def.color, '#fff'], speed: 320 });
+      g.floatText(def.label.toUpperCase(), cx(p.x), cx(p.y) - 24, { color: def.color, size: 26, life: 1.2 });
+      if (p.type === 'shrink') {
+        const cut = Math.min(4, d.body.length - 3);
+        for (let i = 0; i < cut; i++) { const s = d.body.pop(); d.prev.pop(); g.particles.burst(cx(s[0]), cx(s[1]), { count: 8, color: def.color, speed: 150 }); }
+        g.addScore(25, cx(p.x), cx(p.y) + 20, def.color);
+      } else d.active[p.type] = def.dur;
+    }
+
+    function die(g, why) {
+      const d = g.data;
+      d.dieT = 0; d.popped = 0;
+      g.shake(18, 0.4); g.flash('#f43f5e', 0.2);
+      g.over({ title: why, delay: 400 + d.body.length * 20 });
+    }
+
+    /* Simple greedy AI for the attract-mode demo */
+    function aiSteer(g) {
+      const d = g.data, h = d.body[0], f = d.foods[0] || { x: 0, y: 0 };
+      const safe = (dir) => {
+        const [dx, dy] = DIRS[dir]; const x = (h[0] + dx + N) % N, y = (h[1] + dy + N) % N;
+        return !d.walls.has(key(x, y)) && !d.body.slice(0, -1).some((s) => s[0] === x && s[1] === y);
+      };
+      const opts = Object.keys(DIRS).filter((k) => k !== OPP[d.dir] && safe(k));
+      if (!opts.length) return;
+      opts.sort((a, b) => {
+        const da = Math.abs(h[0] + DIRS[a][0] - f.x) + Math.abs(h[1] + DIRS[a][1] - f.y);
+        const db = Math.abs(h[0] + DIRS[b][0] - f.x) + Math.abs(h[1] + DIRS[b][1] - f.y);
+        return da - db;
+      });
+      d.dir = opts[Math.random() < 0.9 ? 0 : opts.length - 1];
+    }
+
+    /* ===================================================================== */
+    /* Rendering                                                             */
+    /* ===================================================================== */
+    function board(g) {
+      const mode = g.options.mode;
+      if (boardCache && boardMode === mode) return boardCache;
+      const o = document.createElement('canvas'); o.width = SIZE; o.height = SIZE; const c = o.getContext('2d');
+      const bg = c.createRadialGradient(SIZE / 2, SIZE / 2, 50, SIZE / 2, SIZE / 2, SIZE * 0.75);
+      bg.addColorStop(0, '#12122e'); bg.addColorStop(1, '#07071a');
+      c.fillStyle = bg; c.fillRect(0, 0, SIZE, SIZE);
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        if ((x + y) % 2) { c.fillStyle = 'rgba(167,139,250,0.035)'; c.fillRect(x * C, y * C, C, C); }
+      }
+      c.fillStyle = 'rgba(167,139,250,0.18)';
+      for (let y = 1; y < N; y++) for (let x = 1; x < N; x++) c.fillRect(x * C - 1, y * C - 1, 2, 2);
+      boardCache = o; boardMode = mode; return o;
+    }
+
+    function draw(g, ctx) {
+      const d = g.data, t = d.clock || 0, sk = skin(g);
+      ctx.drawImage(board(g), 0, 0);
+
+      // borders
+      const mode = g.options.mode;
+      ctx.save();
+      if (mode === 'classic' || mode === 'maze') {
+        ctx.strokeStyle = '#f43f5e'; ctx.shadowColor = '#f43f5e'; ctx.shadowBlur = 16; ctx.lineWidth = 4;
+        ctx.globalAlpha = 0.55 + Math.sin(t * 3) * 0.15;
+        ctx.strokeRect(2, 2, SIZE - 4, SIZE - 4);
+      } else {
+        ctx.strokeStyle = mode === 'zen' ? '#34d399' : '#22d3ee'; ctx.globalAlpha = 0.5; ctx.lineWidth = 3;
+        ctx.setLineDash([10, 12]); ctx.lineDashOffset = -t * 30; ctx.strokeRect(2, 2, SIZE - 4, SIZE - 4);
+      }
+      ctx.restore();
+
+      // maze walls
+      if (d.walls.size) {
+        ctx.save(); ctx.fillStyle = '#2a1650'; ctx.strokeStyle = '#a78bfa'; ctx.shadowColor = '#8b5cf6'; ctx.shadowBlur = 10; ctx.lineWidth = 1.5;
+        d.walls.forEach((k) => { const [x, y] = k.split(',').map(Number); roundRect(ctx, x * C + 2, y * C + 2, C - 4, C - 4, 6); ctx.fill(); ctx.stroke(); });
+        ctx.restore();
+      }
+
+      // food
+      d.foods.forEach((f) => {
+        const x = cx(f.x), y = cx(f.y), age = t - f.born, pop = Math.min(1, age * 4), e = 1 - Math.pow(1 - pop, 3) * (1 - pop) ;
+        const bob = Math.sin(t * 4 + f.x) * 2;
+        ctx.save(); ctx.translate(x, y + bob); ctx.scale(e, e);
+        if (f.type === 'star') {
+          const left = 1 - age / f.life;
+          ctx.strokeStyle = 'rgba(251,191,36,.6)'; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(0, 0, C * 0.62, -Math.PI / 2, -Math.PI / 2 + left * Math.PI * 2); ctx.stroke();
+          ctx.rotate(t * 1.5); ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 24; ctx.fillStyle = '#fcd34d';
+          starPath(ctx, C * 0.42, C * 0.18); ctx.fill();
+        } else {
+          ctx.shadowColor = '#fb7185'; ctx.shadowBlur = 22;
+          const gr = ctx.createRadialGradient(-4, -4, 1, 0, 0, C * 0.38);
+          gr.addColorStop(0, '#fff1f2'); gr.addColorStop(0.35, '#fb7185'); gr.addColorStop(1, '#be123c');
+          ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, C * 0.34, 0, Math.PI * 2); ctx.fill();
+          ctx.shadowBlur = 0; ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(0, -C * 0.3); ctx.quadraticCurveTo(4, -C * 0.48, 9, -C * 0.46); ctx.stroke();
+        }
+        ctx.restore();
+      });
+
+      // power-up item
+      if (d.powerItem) {
+        const p = d.powerItem, def = POWERS[p.type], x = cx(p.x), y = cx(p.y), age = t - p.born;
+        const blink = age > 6 && Math.floor(age * 8) % 2;
+        if (!blink) {
+          ctx.save(); ctx.translate(x, y); ctx.scale(1 + Math.sin(t * 6) * 0.06, 1 + Math.sin(t * 6) * 0.06);
+          ctx.shadowColor = def.color; ctx.shadowBlur = 20; ctx.strokeStyle = def.color; ctx.lineWidth = 2.5; ctx.fillStyle = 'rgba(10,10,30,.85)';
+          roundRect(ctx, -C * 0.42, -C * 0.42, C * 0.84, C * 0.84, 8); ctx.fill(); ctx.stroke();
+          ctx.shadowBlur = 0; powerGlyph(ctx, p.type, def.color, t);
+          ctx.restore();
+        }
+      }
+
+      // snake
+      const dying = g.state === 'dying' || g.state === 'over';
+      const k = dying ? 1 : Math.min(1, d.timer / interval(g));
+      const pts = d.body.map((s, i) => {
+        const p = d.prev[i] || s;
+        if (Math.abs(p[0] - s[0]) > 1 || Math.abs(p[1] - s[1]) > 1) return [cx(s[0]), cx(s[1]), true];
+        return [cx(p[0] + (s[0] - p[0]) * k), cx(p[1] + (s[1] - p[1]) * k), false];
+      });
+      const start = dying ? d.popped : 0;
+      const ghost = d.active.ghost > 0;
+      ctx.save();
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      if (ghost) ctx.globalAlpha = 0.55 + Math.sin(t * 12) * 0.15;
+      // glow pass
+      ctx.shadowColor = sk.glow; ctx.shadowBlur = 18; ctx.strokeStyle = sk.glow; ctx.lineWidth = C * 0.62;
+      ctx.globalAlpha *= 0.35; strokeBody(ctx, pts, start); ctx.globalAlpha = ghost ? 0.7 : 1;
+      ctx.shadowBlur = 0;
+      // colored segments, tail → head
+      const n = pts.length;
+      for (let i = n - 2; i >= start; i--) {
+        if (Math.abs(pts[i][0] - pts[i + 1][0]) + Math.abs(pts[i][1] - pts[i + 1][1]) > C * 1.5) continue;
+        const kk = i / Math.max(1, n - 1);
+        ctx.strokeStyle = sk.color(kk, t);
+        ctx.lineWidth = C * (0.78 - kk * 0.28);
+        ctx.beginPath(); ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[i + 1][0], pts[i + 1][1]); ctx.stroke();
+      }
+      if (sk.sparkle) for (let i = start; i < n; i += 2) { if (Math.sin(t * 7 + i * 3) > 0.7) { ctx.fillStyle = '#fff'; ctx.fillRect(pts[i][0] - 1 + Math.sin(i) * 5, pts[i][1] - 1 + Math.cos(i) * 5, 2, 2); } }
+      // head
+      if (start === 0 && n) {
+        const [hx, hy] = pts[0], [dx, dy] = DIRS[d.dir];
+        ctx.fillStyle = sk.color(0, t); ctx.shadowColor = sk.glow; ctx.shadowBlur = 14;
+        ctx.beginPath(); ctx.arc(hx, hy, C * 0.46, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+        // mouth
+        if (d.mouth > 0.05 && !dying) {
+          ctx.fillStyle = '#1a0510'; ctx.beginPath();
+          const a = Math.atan2(dy, dx), m = d.mouth * 0.5;
+          ctx.moveTo(hx, hy); ctx.arc(hx, hy, C * 0.46, a - m, a + m); ctx.fill();
+        }
+        // eyes
+        const px = -dy, py = dx, eo = C * 0.2, ef = C * 0.12;
+        [1, -1].forEach((sgn) => {
+          const ex = hx + px * eo * sgn + dx * ef, ey = hy + py * eo * sgn + dy * ef;
+          ctx.fillStyle = '#fff'; ctx.beginPath();
+          if (d.blink < 0 || dying) ctx.ellipse(ex, ey, C * 0.11, C * 0.03, Math.atan2(py, px) + Math.PI / 2, 0, Math.PI * 2);
+          else ctx.arc(ex, ey, C * 0.11, 0, Math.PI * 2);
+          ctx.fill();
+          if (!(d.blink < 0) && !dying) { ctx.fillStyle = sk.eye; ctx.beginPath(); ctx.arc(ex + dx * 2, ey + dy * 2, C * 0.055, 0, Math.PI * 2); ctx.fill(); }
+        });
+        if (dying) { ctx.strokeStyle = '#111'; ctx.lineWidth = 2; }
+      }
+      ctx.restore();
+
+      // active power-up pills
+      let py0 = 14;
+      Object.keys(d.active).forEach((kk) => {
+        const left = d.active[kk]; if (!(left > 0)) return;
+        const def = POWERS[kk], w = 132;
+        ctx.save(); ctx.globalAlpha = 0.92;
+        ctx.fillStyle = 'rgba(10,10,30,.75)'; roundRect(ctx, 14, py0, w, 28, 14); ctx.fill();
+        ctx.strokeStyle = def.color; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.fillStyle = def.color; ctx.globalAlpha = 0.3; roundRect(ctx, 14, py0, w * (left / def.dur), 28, 14); ctx.fill();
+        ctx.globalAlpha = 1; ctx.font = '600 14px "Chakra Petch", sans-serif'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff';
+        ctx.fillText(def.label + '  ' + left.toFixed(1) + 's', 28, py0 + 14.5);
+        ctx.restore(); py0 += 36;
+      });
+    }
+
+    function strokeBody(ctx, pts, start) {
+      ctx.beginPath();
+      for (let i = start; i < pts.length; i++) {
+        const jump = i > start && Math.abs(pts[i][0] - pts[i - 1][0]) + Math.abs(pts[i][1] - pts[i - 1][1]) > C * 1.5;
+        if (i === start || jump) ctx.moveTo(pts[i][0], pts[i][1]); else ctx.lineTo(pts[i][0], pts[i][1]);
+      }
+      ctx.stroke();
+    }
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+    }
+    function starPath(ctx, R, r) {
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r : R; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      ctx.closePath();
+    }
+    function powerGlyph(ctx, type, col, t) {
+      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      if (type === 'slow') {
+        ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -5); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(t * 2) * 5, Math.sin(t * 2) * 5); ctx.stroke();
+      } else if (type === 'ghost') {
+        ctx.setLineDash([3, 3]); ctx.lineDashOffset = -t * 10; ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(0, 0, 2.5, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.font = '400 13px "Russo One", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(type === 'double' ? 'x2' : '-4', 0, 1);
+      }
+    }
+  })();
+  </script>
+</body>
+</html>
