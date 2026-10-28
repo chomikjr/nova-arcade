@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en" data-no-music>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b1d">
+  <title>Play — Nova Arcade</title>
+  <link rel="stylesheet" href="../assets/core.css">
+  <link rel="stylesheet" href="../assets/game.css">
+  <style>
+    body { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+    .p-stage { flex: 1; min-height: 0; padding: 16px; display: flex; }
+    .p-frame {
+      position: relative; flex: 1; border-radius: 18px; overflow: hidden; background: #000;
+      box-shadow: 0 0 0 1px var(--border-strong), 0 30px 80px -30px rgba(0,0,0,.9), 0 0 80px -30px var(--primary-glow);
+    }
+    .p-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
+    .p-frame:fullscreen { border-radius: 0; }
+    .p-cover { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; background: radial-gradient(ellipse at center, rgba(30,28,53,.92), rgba(7,7,20,.97)); transition: opacity .4s var(--ease-out); z-index: 2; }
+    .p-cover.is-hidden { opacity: 0; pointer-events: none; }
+    .p-cover-card { display: grid; gap: 14px; justify-items: center; max-width: 420px; animation: ov-in .45s var(--ease-spring); }
+    .p-cover img { width: min(360px, 80vw); aspect-ratio: 16/10; object-fit: cover; border-radius: 14px; box-shadow: 0 20px 50px -20px rgba(0,0,0,.8); border: 1px solid var(--border); }
+    .p-cover h2 { font-size: clamp(28px, 5vw, 40px); }
+    .p-cover p { color: var(--fg-dim); }
+    .spinner { width: 44px; height: 44px; border-radius: 50%; border: 4px solid rgba(255,255,255,.12); border-top-color: var(--primary-2); animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes ov-in { from { opacity: 0; transform: translateY(14px) scale(.96); } }
+    .p-meta { display: flex; gap: 8px; align-items: center; color: var(--fg-faint); font-size: 13px; }
+    @media (max-width: 640px) { .p-stage { padding: 8px; } .p-frame { border-radius: 12px; } }
+  </style>
+</head>
+<body>
+  <header class="g-top">
+    <a class="btn btn-ghost btn-sm" id="back" aria-label="Back to arcade"></a>
+    <div class="g-title"><h1 id="title">Loading…</h1><span id="tier"></span></div>
+    <div class="g-hud" style="visibility:hidden"></div>
+    <div class="g-actions">
+      <button class="icon-btn" id="btn-info" aria-label="About this game"></button>
+      <button class="icon-btn" id="btn-reload" aria-label="Restart game"></button>
+      <button class="icon-btn" id="btn-settings" aria-label="Settings"></button>
+      <button class="icon-btn hide-sm" id="btn-full" aria-label="Fullscreen (F)"></button>
+      <span id="account"></span>
+    </div>
+  </header>
+  <main class="p-stage">
+    <div class="p-frame" id="frame">
+      <div class="p-cover" id="cover"><div class="p-cover-card"><div class="spinner" role="status" aria-label="Loading"></div></div></div>
+    </div>
+  </main>
+
+  <script src="../assets/core.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const A = Arcade, icon = A.icon, esc = A.esc, $ = (s) => document.querySelector(s);
+    const id = new URLSearchParams(location.search).get('g');
+    const game = A.games.find((g) => g.id === id && g.path && g.path.indexOf('play.html') >= 0);
+    const frame = $('#frame'), cover = $('#cover');
+    let iframe = null, started = 0;
+
+    $('#back').innerHTML = icon('arrowLeft') + '<span class="back-label">Arcade</span>';
+    $('#back').href = A.url('index.html#games');
+    $('#btn-info').innerHTML = icon('info'); $('#btn-reload').innerHTML = icon('refresh');
+    $('#btn-settings').innerHTML = icon('settings'); $('#btn-full').innerHTML = icon('maximize');
+    $('#btn-settings').addEventListener('click', A.ui.openSettings);
+    $('#btn-full').addEventListener('click', toggleFull);
+    addEventListener('keydown', (e) => { if (e.code === 'KeyF' && !document.querySelector('.modal-backdrop')) toggleFull(); });
+
+    if (!game) {
+      $('#title').textContent = 'Game not found';
+      showCover('<h2>Game not found</h2><p>That game doesn’t exist (anymore).</p><a class="btn btn-primary" href="' + A.url('index.html#games') + '">' + icon('home') + 'Back to the arcade</a>');
+      return;
+    }
+    document.title = game.title + ' — Nova Arcade';
+    $('#title').textContent = game.title;
+    $('#tier').innerHTML = game.tier === 'pro' ? '<span class="badge badge-pro">' + icon('crown') + 'Pro</span>' : '<span class="badge badge-free">Free</span>';
+    $('#btn-info').addEventListener('click', openInfo);
+    $('#btn-reload').addEventListener('click', () => { if (iframe) { capture(); iframe.src = iframe.src; A.ui.toast('Restarted ' + game.title, 'refresh'); } });
+
+    function paintAccount() {
+      const u = A.auth.current(), slot = $('#account');
+      slot.innerHTML = u
+        ? '<button class="avatar" style="border:0;cursor:pointer;background:linear-gradient(135deg,hsl(' + u.hue + ',80%,60%),hsl(' + (u.hue + 60) + ',80%,55%))" aria-label="Your profile">' + esc(u.username[0].toUpperCase()) + '</button>'
+        : '<button class="btn btn-primary btn-sm">' + icon('user') + '<span class="hide-sm">Log in</span></button>';
+      slot.firstElementChild.addEventListener('click', () => (u ? A.ui.openProfile() : A.ui.openAuth()));
+    }
+
+    function showCover(html) { cover.innerHTML = '<div class="p-cover-card">' + html + '</div>'; cover.classList.remove('is-hidden'); }
+    const thumb = game.image ? '<img src="ports/_thumbs/' + game.image + '.webp" alt="">' : '';
+
+    /* ---------- Pro gate (decided after the account session has loaded) ---------- */
+    function gate() {
+      paintAccount();
+      if (iframe) return;
+      if (game.tier === 'pro' && !A.auth.isPro()) {
+        const u = A.auth.current();
+        showCover(thumb + '<span class="badge badge-pro">' + icon('crown') + 'Pro game</span><h2>' + esc(game.title) + '</h2><p>' + esc(game.tagline) + '</p>' +
+          '<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"><button class="btn btn-accent btn-lg" id="go-pro">' + icon('crown') + 'See Pro</button>' +
+          (u ? '' : '<button class="btn btn-lg" id="go-login">' + icon('user') + 'Log in</button>') + '</div>');
+        $('#go-pro').addEventListener('click', () => A.ui.openUpgrade(game.title + ' is part of Pro.'));
+        const l = $('#go-login'); if (l) l.addEventListener('click', () => A.ui.openAuth('login'));
+        return;
+      }
+      showCover(thumb + '<h2>' + esc(game.title) + '</h2><p>' + esc(game.tagline) + '</p>' +
+        '<button class="btn btn-primary btn-lg" id="go-play">' + icon('play') + 'Play</button>' +
+        '<div class="p-meta">' + icon('keyboard').replace('<svg', '<svg width="16" height="16"') + esc(game.controls || '') + '</div>' +
+        '<div class="p-meta">by ' + esc(game.author) + ' · ' + esc(game.license) + '</div>');
+      const go = $('#go-play'); go.focus({ preventScroll: true });
+      go.addEventListener('click', start);
+    }
+
+    function start() {
+      restore();
+      A.audio.music.stop(true);
+      iframe = document.createElement('iframe');
+      iframe.title = game.title;
+      iframe.allow = 'fullscreen; autoplay; gamepad';
+      iframe.src = 'ports/' + game.id + '/index.html';
+      iframe.addEventListener('load', () => { cover.classList.add('is-hidden'); try { iframe.contentWindow.focus(); } catch (e) {} });
+      frame.appendChild(iframe);
+      showCover('<div class="spinner" role="status" aria-label="Loading"></div><p>Loading ' + esc(game.title) + '…</p>');
+      started = performance.now();
+      A.audio.sfx('start');
+    }
+    frame.addEventListener('pointerdown', () => { try { iframe && iframe.contentWindow.focus(); } catch (e) {} });
+
+    /* ---------- Cloud saves: these games keep progress in localStorage, so we
+       snapshot whatever keys the game writes and sync them with the account ---------- */
+    const isOwnKey = (k) => k.startsWith('nova.') || k.startsWith('sb-');
+    let before = {}, owned = new Set();
+    function restore() {
+      const saved = (A.store.get('portsaves', {})[game.id]) || {};
+      Object.keys(saved).forEach((k) => { try { localStorage.setItem(k, saved[k]); } catch (e) {} owned.add(k); });
+      before = {}; Object.keys(localStorage).forEach((k) => { if (!isOwnKey(k)) before[k] = localStorage.getItem(k); });
+    }
+    function capture() {
+      if (!iframe) return;
+      const out = {}; let size = 0;
+      Object.keys(localStorage).forEach((k) => {
+        if (isOwnKey(k)) return;
+        const v = localStorage.getItem(k);
+        if (owned.has(k) || v !== before[k]) {
+          if (v.length > 400000 || size + v.length > 900000) return;
+          owned.add(k); out[k] = v; size += v.length;
+        }
+      });
+      const all = A.store.get('portsaves', {});
+      if (JSON.stringify(all[game.id] || {}) !== JSON.stringify(out)) { all[game.id] = out; A.store.set('portsaves', all); }
+    }
+    setInterval(capture, 15000);
+    function finish() {
+      if (!iframe || !started) return;
+      capture();
+      A.scores.recordPlay(game.id, (performance.now() - started) / 1000); started = 0;
+      if (A.cloud.user) A.cloud.push();
+    }
+    addEventListener('pagehide', finish);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) capture(); });
+
+    function openInfo() {
+      const r = A.scores.get(game.id);
+      A.ui.modal(
+        thumb.replace('<img', '<img style="width:100%;border-radius:12px;margin-bottom:16px;aspect-ratio:16/10;object-fit:cover"') +
+        '<h2>' + esc(game.title) + '</h2><p class="modal-sub">' + esc(game.tagline) + '</p>' +
+        '<div style="display:grid;gap:10px">' +
+        '<div class="setting-row"><span class="label">Controls</span><span>' + esc(game.controls || '—') + '</span></div>' +
+        '<div class="setting-row"><span class="label">Your sessions</span><span>' + r.plays + ' · ' + A.ui.fmtTime(r.time) + '</span></div>' +
+        '<div class="setting-row"><span class="label">Made by</span><span>' + esc(game.author) + '</span></div>' +
+        '<div class="setting-row"><span class="label">License</span><span class="badge">' + esc(game.license) + '</span></div>' +
+        '<div class="setting-row"><span class="label">Source</span><a href="https://github.com/' + esc(game.repo) + '" target="_blank" rel="noopener">github.com/' + esc(game.repo) + '</a></div>' +
+        '</div><p class="field-hint" style="margin-top:16px">Open-source game, hosted unmodified apart from removed trackers and ads. Progress syncs to your account.</p>',
+        { label: 'About ' + game.title });
+    }
+
+    function toggleFull() {
+      if (!document.fullscreenElement) (frame.requestFullscreen || frame.webkitRequestFullscreen || (() => {})).call(frame);
+      else (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    }
+
+    A.on('auth', gate);
+    paintAccount();
+    A.ready.then(gate, gate);
+  })();
+  </script>
+</body>
+</html>

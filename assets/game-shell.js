@@ -279,12 +279,18 @@
       side.innerHTML =
         '<section><h3>' + icon('trophy') + 'Your best</h3><div class="side-best">' + me.best.toLocaleString() + '</div><div class="field-hint" style="margin-top:6px">' + me.plays + ' runs · ' + A.ui.fmtTime(me.time) + ' played</div></section>' +
         (!u ? '<div class="side-guest"><span>Playing as guest. Make a free account to keep your scores on a profile.</span><button class="btn btn-primary btn-sm sd-join">' + icon('user') + 'Create free account</button></div>' : '') +
-        '<section><h3>' + icon('chart') + 'Leaderboard <span class="badge" style="margin-left:auto">This device</span></h3>' +
-        (lb.length ? '<ol class="lb">' + lb.map((r, i) => '<li class="' + (r.me ? 'me' : '') + '"><span class="rk">' + (i + 1) + '</span><span class="dot" style="background:hsl(' + r.hue + ',80%,60%)"></span><span class="nm">' + esc(r.name) + '</span><span class="sc">' + r.best.toLocaleString() + '</span></li>').join('') + '</ol>' : '<p class="side-empty">No scores yet — be the first.</p>') + '</section>' +
+        '<section class="sd-lb"></section>' +
         '<section><h3>' + icon('clock') + 'Recent runs</h3>' +
         (me.history.length ? '<ol class="lb">' + me.history.slice(0, 5).map((h) => '<li><span class="nm" style="font-weight:500;color:var(--fg-dim)">' + esc(h.mode || '—') + '</span><span class="sc">' + h.score.toLocaleString() + '</span></li>').join('') + '</ol>' : '<p class="side-empty">Your runs will show up here.</p>') + '</section>' +
         '<section><h3>' + icon('keyboard') + 'Controls</h3>' + ctrls.map(([k, l]) => '<div class="ctrl-row"><span>' + k.split(' / ').map(kbd).join(' ') + '</span><span>' + esc(l) + '</span></div>').join('') + '</section>';
       const j = side.querySelector('.sd-join'); if (j) j.addEventListener('click', () => A.ui.openAuth('signup'));
+      const paintLb = (rows, scope) => {
+        const el = side.querySelector('.sd-lb'); if (!el) return;
+        el.innerHTML = '<h3>' + icon('chart') + 'Leaderboard <span class="badge" style="margin-left:auto">' + (scope === 'global' ? 'Global' : 'This device') + '</span></h3>' +
+          (rows.length ? '<ol class="lb">' + rows.map((r, i) => '<li class="' + (r.me ? 'me' : '') + '"><span class="rk">' + (i + 1) + '</span><span class="dot" style="background:hsl(' + r.hue + ',80%,60%)"></span><span class="nm">' + esc(r.name) + '</span><span class="sc">' + r.best.toLocaleString() + '</span></li>').join('') + '</ol>' : '<p class="side-empty">No scores yet — be the first.</p>');
+      };
+      paintLb(lb, 'device');
+      A.scores.leaderboardAsync(def.id, 6).then((r) => paintLb(r.rows, r.scope));
     }
 
     /* ---------- Input ---------- */
@@ -311,6 +317,7 @@
     document.addEventListener('visibilitychange', () => document.hidden && pause());
     A.on('settings', () => paintAccount());
     A.on('auth', () => { paintAccount(); paintSide(); if (g.state === 'menu') showMenu(); });
+    A.on('synced', () => { if (g.state !== 'playing') paintSide(); });
 
     // swipe + tap on the canvas
     let sx = 0, sy = 0, st = 0, swiped = false;

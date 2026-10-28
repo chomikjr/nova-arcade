@@ -72,8 +72,8 @@
     }
     .game-card:hover { border-color: var(--border-strong); box-shadow: 0 30px 60px -25px rgba(0,0,0,.8), 0 0 50px -20px hsl(var(--h) 90% 60% / .6); }
     .game-card .thumb { position: relative; aspect-ratio: 16/10; overflow: hidden; background: #07071a; }
-    .game-card .thumb canvas { width: 100%; height: 100%; transition: transform .6s var(--ease-out), filter .3s; }
-    .game-card:hover .thumb canvas { transform: scale(1.06); }
+    .game-card .thumb canvas, .game-card .thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s var(--ease-out), filter .3s; }
+    .game-card:hover .thumb canvas, .game-card:hover .thumb img { transform: scale(1.06); }
     .game-card.is-soon .thumb canvas { filter: saturate(.55) brightness(.7); }
     .game-card .thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 50%, rgba(11,11,29,.85)); }
     .thumb-badges { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; z-index: 2; }
@@ -238,7 +238,7 @@
     <!-- LEADERBOARD -->
     <section class="section" id="leaderboard">
       <div class="container">
-        <div class="section-head reveal"><div><span class="eyebrow">Hall of fame</span><h2 class="section-title">Leaderboard</h2><p class="section-sub">Top scores from every profile on this device. Global boards arrive with cloud accounts.</p></div></div>
+        <div class="section-head reveal"><div><span class="eyebrow">Hall of fame</span><h2 class="section-title">Leaderboard</h2><p class="section-sub">The best players across Nova Arcade. Create an account to get your name up here.</p></div><span class="badge" id="lb-scope">Global</span></div>
         <div class="lb-wrap glass reveal">
           <div class="lb-tabs" id="lb-tabs" role="tablist" aria-label="Choose a game"></div>
           <div id="lb-body" role="tabpanel"></div>
@@ -286,10 +286,10 @@
         slot.querySelectorAll('[data-auth]').forEach((b) => b.addEventListener('click', () => A.ui.openAuth(b.dataset.auth)));
       } else {
         slot.innerHTML = '<div class="dropdown" id="acct-dd"><button class="avatar" style="border:0;cursor:pointer;background:linear-gradient(135deg,hsl(' + u.hue + ',80%,60%),hsl(' + (u.hue + 60) + ',80%,55%))" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu">' + esc(u.username[0].toUpperCase()) + '</button>' +
-          '<div class="dropdown-menu" role="menu"><div class="dropdown-head"><b>' + esc(u.username) + '</b><div style="margin-top:6px"><span class="badge ' + (u.plan === 'pro' ? 'badge-pro' : 'badge-free') + '">' + (u.plan === 'pro' ? 'Pro' : 'Free plan') + '</span></div></div>' +
+          '<div class="dropdown-menu" role="menu"><div class="dropdown-head"><b>' + esc(u.username) + '</b><div style="margin-top:6px"><span class="badge ' + (A.auth.isPro() ? 'badge-pro' : 'badge-free') + '">' + (A.auth.isOwner() ? 'Owner · Pro' : A.auth.isPro() ? 'Pro' : 'Free plan') + '</span></div></div>' +
           '<button class="dropdown-item" role="menuitem" data-act="profile">' + icon('user') + 'Profile &amp; stats</button>' +
           '<button class="dropdown-item" role="menuitem" data-act="settings">' + icon('settings') + 'Settings</button>' +
-          (u.plan !== 'pro' ? '<button class="dropdown-item" role="menuitem" data-act="upgrade">' + icon('crown') + 'Upgrade to Pro</button>' : '') +
+          (!A.auth.isPro() ? '<button class="dropdown-item" role="menuitem" data-act="upgrade">' + icon('crown') + 'Upgrade to Pro</button>' : '') +
           '<button class="dropdown-item" role="menuitem" data-act="logout">' + icon('logout') + 'Log out</button></div></div>';
         const dd = $('#acct-dd'), btn = dd.querySelector('.avatar');
         btn.addEventListener('click', (e) => { e.stopPropagation(); const open = !dd.classList.contains('is-open'); dd.classList.toggle('is-open', open); btn.setAttribute('aria-expanded', open); });
@@ -321,7 +321,7 @@
     A.on('score', paintAccount);
 
     /* ---------- Games grid ---------- */
-    const FILTERS = ['All', 'Free', 'Pro', 'Arcade', 'Puzzle', 'Shooter'];
+    const FILTERS = ['All', 'Free', 'Pro'].concat([...new Set(A.games.flatMap((g) => g.tags))].sort());
     let filter = 'All', query = '';
     $('#filters').innerHTML = FILTERS.map((f) => '<button class="chip" data-f="' + f + '" aria-pressed="' + (f === filter) + '">' + f + '</button>').join('');
     $('#filters').addEventListener('click', (e) => {
@@ -347,14 +347,14 @@
         const statusB = live ? '' : '<span class="badge">' + icon(g.tier === 'pro' ? 'lock' : 'clock') + 'Coming soon</span>';
         const tag = live ? 'a href="' + g.path + '"' : 'div';
         return '<' + tag + ' class="game-card reveal ' + (live ? '' : 'is-soon') + '" style="--h:' + g.hue + ';transition-delay:' + i * 60 + 'ms" data-id="' + g.id + '"' + (live ? ' aria-label="Play ' + esc(g.title) + '"' : ' aria-disabled="true"') + '>' +
-          '<div class="thumb"><canvas width="540" height="338" aria-hidden="true"></canvas><div class="thumb-badges">' + tierB + statusB + '</div>' + (live ? '<span class="play-fab" aria-hidden="true">' + icon('play') + '</span>' : '') + '</div>' +
+          '<div class="thumb">' + (g.image ? '<img src="games/ports/_thumbs/' + g.image + '.webp" alt="" loading="lazy" width="640" height="400">' : '<canvas width="540" height="338" aria-hidden="true"></canvas>') + '<div class="thumb-badges">' + tierB + statusB + '</div>' + (live ? '<span class="play-fab" aria-hidden="true">' + icon('play') + '</span>' : '') + '</div>' +
           '<div class="body"><h3>' + esc(g.title) + '</h3><p>' + esc(g.tagline) + '</p><div class="tags">' + g.tags.map((t) => '<span class="tag">' + esc(t) + '</span>').join('') + '</div>' +
-          '<div class="meta">' + (live ? '<span>' + icon('trophy').replace('<svg', '<svg width="14" height="14" style="display:inline;vertical-align:-2px"') + ' Best <b>' + best.toLocaleString() + '</b></span><span>' + plays + ' plays</span>' : '<span>' + (g.tier === 'pro' ? 'Included with Pro' : 'Free when it launches') + '</span>') + '</div></div>' +
+          '<div class="meta">' + (live ? (g.original ? '<span>' + icon('trophy').replace('<svg', '<svg width="14" height="14" style="display:inline;vertical-align:-2px"') + ' Best <b>' + best.toLocaleString() + '</b></span>' : '<span title="' + esc(g.license + ' · ' + g.author) + '">by ' + esc(g.author) + '</span>') + '<span>' + plays + ' plays</span>' : '<span>' + (g.tier === 'pro' ? 'Included with Pro' : 'Free when it launches') + '</span>') + '</div></div>' +
           '</' + (live ? 'a' : 'div') + '>';
       }).join('');
       grid.querySelectorAll('.game-card').forEach((card) => {
         const g = A.games.find((x) => x.id === card.dataset.id);
-        const th = startThumb(card.querySelector('canvas'), g.thumb, g.hue); thumbs.set(card, th);
+        const cv = card.querySelector('canvas'); if (cv) thumbs.set(card, startThumb(cv, g.thumb, g.hue));
         tilt(card, 6);
         if (g.status !== 'live') card.addEventListener('click', () => { if (g.tier === 'pro') A.ui.openUpgrade(g.title + ' will be part of Pro.'); else A.ui.toast(g.title + ' is in the works — check back soon!', 'clock'); });
         reveal(card);
@@ -434,6 +434,51 @@
         c.shadowBlur = 16; c.shadowColor = '#fbbf24'; c.fillStyle = '#fde68a'; c.beginPath(); c.arc(bx, by, 7, 0, 7); c.fill();
         c.shadowColor = '#a78bfa'; c.fillStyle = '#a78bfa'; c.fillRect(bx - 45, h - 26, 90, 10); c.shadowBlur = 0;
       },
+      trex(c, w, h, t, s) {
+        if (!s.cacti) { s.cacti = [w * 0.6, w * 1.1]; s.y = 0; s.vy = 0; s.x0 = 0; }
+        c.fillStyle = '#f7f7f7'; c.fillRect(0, 0, w, h);
+        const gy = h * 0.72, sp = 260 * s.dt; s.x0 = (s.x0 + sp) % 40;
+        c.fillStyle = '#535353'; c.fillRect(0, gy, w, 2);
+        for (let x = -s.x0; x < w; x += 40) c.fillRect(x, gy + 8 + (x * 7 % 9), 6, 2);
+        s.cacti = s.cacti.map((x) => (x - sp < -30 ? w + Math.random() * 200 : x - sp));
+        const near = s.cacti.some((x) => x > 70 && x < 150);
+        if (near && s.y === 0) s.vy = 520; s.vy -= 1500 * s.dt; s.y = Math.max(0, s.y + s.vy * s.dt); if (s.y === 0) s.vy = 0;
+        s.cacti.forEach((x) => { c.fillRect(x, gy - 46, 14, 46); c.fillRect(x - 10, gy - 34, 10, 6); c.fillRect(x - 10, gy - 40, 5, 12); c.fillRect(x + 14, gy - 30, 10, 6); c.fillRect(x + 19, gy - 38, 5, 12); });
+        const dx = 80, dy = gy - 44 - s.y, leg = Math.floor(t * 10) % 2;
+        c.fillRect(dx + 20, dy, 26, 18); c.fillRect(dx, dy + 14, 34, 20); c.fillRect(dx + 30, dy + 18, 8, 4); c.fillRect(dx - 8, dy + 16, 10, 8);
+        c.fillRect(dx + 6 + (s.y ? 0 : leg * 10), dy + 34, 6, 10); c.fillRect(dx + 20 - (s.y ? 0 : leg * 10), dy + 34, 6, 10);
+        c.fillStyle = '#fff'; c.fillRect(dx + 26, dy + 4, 4, 4);
+        c.fillStyle = '#535353'; c.font = '20px monospace'; c.textAlign = 'right'; c.fillText('HI ' + String(Math.floor(t * 10) % 100000).padStart(5, '0'), w - 20, 34);
+      },
+      maze(c, w, h, t, s) {
+        const n = 13, cs = Math.min(w, h) / n * 1.4;
+        if (!s.m) { const r = (a) => Math.floor(Math.random() * a); s.m = Array.from({ length: 20 * 13 }, () => r(3) === 0); }
+        c.fillStyle = '#050505'; c.fillRect(0, 0, w, h);
+        const bx = w / 2 + Math.sin(t * 0.8) * w * 0.15, by = h / 2 + Math.cos(t * 0.6) * h * 0.15;
+        c.save(); c.translate(w / 2, h / 2); c.rotate(-0.35); c.translate(-w / 2, -h / 2);
+        for (let y = -3; y < 13; y++) for (let x = -3; x < 20; x++) {
+          if (!s.m[((y + 13) % 13) * 20 + ((x + 20) % 20)]) continue;
+          const px = x * cs - (t * 18) % cs, py = y * cs * 0.75, d = Math.hypot(px + cs / 2 - bx, py + cs / 2 - by);
+          const a = Math.max(0, 1 - d / (w * 0.42));
+          c.fillStyle = 'rgba(' + Math.round(120 * a + 20) + ',' + Math.round(100 * a + 15) + ',' + Math.round(60 * a + 10) + ',1)';
+          c.fillRect(px, py, cs - 3, cs * 0.75 - 3);
+        }
+        c.restore();
+        const g = c.createRadialGradient(bx, by, 2, bx, by, 60); g.addColorStop(0, 'rgba(255,220,120,.9)'); g.addColorStop(1, 'rgba(255,200,80,0)');
+        c.fillStyle = g; c.fillRect(0, 0, w, h);
+        c.fillStyle = '#ffe9a8'; c.beginPath(); c.arc(bx, by, 11, 0, 7); c.fill();
+      },
+      darkroom(c, w, h, t, s) {
+        c.fillStyle = '#111'; c.fillRect(0, 0, w, h);
+        const lines = ['the fire is dead.', 'the room is freezing.', 'the fire is burning.', 'a stranger stumbles through the door.', 'the room is warm.'];
+        const show = Math.min(lines.length, 1 + Math.floor((t % 14) / 2.4));
+        c.font = '17px Georgia, serif'; c.textAlign = 'left';
+        for (let i = 0; i < show; i++) { c.globalAlpha = i === show - 1 ? Math.min(1, ((t % 14) % 2.4) * 1.5) : 0.75 - (show - 1 - i) * 0.12; c.fillStyle = '#ddd'; c.fillText(lines[i], 40, 60 + i * 30); }
+        c.globalAlpha = 1;
+        const lit = show >= 3, fx = w * 0.72, fy = h * 0.66;
+        c.strokeStyle = '#999'; c.lineWidth = 1.5; c.strokeRect(fx - 60, fy + 10, 120, 34); c.fillStyle = '#ccc'; c.font = '15px Georgia'; c.textAlign = 'center'; c.fillText(lit ? 'stoke fire' : 'light fire', fx, fy + 32);
+        if (lit) { for (let i = 0; i < 18; i++) { const a = (t * 2 + i) % 1; c.fillStyle = 'rgba(255,' + Math.round(140 + 80 * a) + ',60,' + (1 - a) * 0.8 + ')'; c.beginPath(); c.arc(fx - 30 + (i * 37 % 60) + Math.sin(t * 4 + i) * 4, fy - a * 70, 6 * (1 - a) + 1, 0, 7); c.fill(); } }
+      },
       default(c, w, h) { c.fillStyle = '#07071a'; c.fillRect(0, 0, w, h); }
     };
     function block(c, x, y, s, col, a, hh) { c.globalAlpha = a; c.fillStyle = col; c.fillRect(x + 1, y + 1, s - 2, (hh || s) - 2); c.fillStyle = 'rgba(255,255,255,.25)'; c.fillRect(x + 1, y + 1, s - 2, 3); c.globalAlpha = 1; }
@@ -489,11 +534,11 @@
       const u = A.auth.current(), pro = A.config.pro;
       const li = (t) => '<li>' + icon('check') + '<span>' + esc(t) + '</span></li>';
       $('#plans-grid').innerHTML =
-        '<div class="plan glass reveal">' + (u && u.plan !== 'pro' ? '<span class="badge badge-free current-plan">Your plan</span>' : '') +
+        '<div class="plan glass reveal">' + (u && !A.auth.isPro() ? '<span class="badge badge-free current-plan">Your plan</span>' : '') +
         '<span class="eyebrow">Free</span><h3>Player</h3><div class="price">$0 <small>forever</small></div>' +
         '<ul>' + ['All free games, unlimited plays', 'Profiles with saved high scores & stats', 'Animated backgrounds & custom images', 'Music, sound effects and accent themes', 'Device leaderboards'].map(li).join('') + '</ul>' +
         (u ? '<a class="btn btn-lg btn-block" href="#games">' + icon('play') + 'Keep playing</a>' : '<button class="btn btn-primary btn-lg btn-block" data-join>' + icon('user') + 'Create free account</button>') + '</div>' +
-        '<div class="plan plan-pro reveal" style="transition-delay:80ms"><div style="display:flex;gap:8px"><span class="badge badge-pro">' + icon('crown') + 'Pro</span>' + (!pro.available ? '<span class="badge">Coming soon</span>' : '') + '</div>' +
+        '<div class="plan plan-pro reveal" style="transition-delay:80ms">' + (A.auth.isPro() ? '<span class="badge badge-pro current-plan">' + (A.auth.isOwner() ? 'Owner' : 'Your plan') + '</span>' : '') + '<div style="display:flex;gap:8px"><span class="badge badge-pro">' + icon('crown') + 'Pro</span>' + (!pro.available ? '<span class="badge">Coming soon</span>' : '') + '</div>' +
         '<h3>Pro Player</h3><div class="price">' + esc(pro.priceLabel) + '</div>' +
         '<ul>' + ['Everything in Free'].concat(pro.perks).map(li).join('') + '</ul>' +
         '<button class="btn btn-accent btn-lg btn-block" data-pro>' + icon(pro.available ? 'crown' : 'bell') + (pro.available ? 'Upgrade to Pro' : 'Get notified') + '</button></div>';
@@ -505,10 +550,15 @@
     /* ---------- Leaderboard ---------- */
     let lbGame = 'snake';
     function paintLB() {
-      const live = A.games.filter((g) => g.status === 'live');
+      const live = A.games.filter((g) => g.status === 'live' && g.original);
       $('#lb-tabs').innerHTML = live.map((g) => '<button class="lb-tab" role="tab" aria-selected="' + (g.id === lbGame) + '" data-g="' + g.id + '"><span class="dot" style="background:hsl(' + g.hue + ',85%,55%)"></span>' + esc(g.title) + '</button>').join('');
       $('#lb-tabs').querySelectorAll('[data-g]').forEach((b) => b.addEventListener('click', () => { lbGame = b.dataset.g; paintLB(); }));
-      const rows = A.scores.leaderboard(lbGame, 10), g = A.games.find((x) => x.id === lbGame);
+      const g = A.games.find((x) => x.id === lbGame), want = lbGame;
+      renderLB(A.scores.leaderboard(lbGame, 10), g, 'device');
+      A.scores.leaderboardAsync(lbGame, 10).then((res) => { if (lbGame === want) renderLB(res.rows, g, res.scope); });
+    }
+    function renderLB(rows, g, scope) {
+      $('#lb-scope').textContent = scope === 'global' ? 'Global' : 'This device';
       $('#lb-body').innerHTML = rows.length
         ? '<ol class="lb-list">' + rows.map((r, i) => '<li class="' + (r.me ? 'me' : '') + '" style="animation-delay:' + i * 50 + 'ms"><span class="lb-rank">' + (i + 1) + '</span><span class="avatar" style="background:linear-gradient(135deg,hsl(' + r.hue + ',80%,60%),hsl(' + (r.hue + 60) + ',80%,55%))">' + esc(r.name[0].toUpperCase()) + '</span><span><b>' + esc(r.name) + '</b>' + (r.me ? ' <span class="badge" style="margin-left:6px">You</span>' : '') + '<div class="field-hint">' + r.plays + ' plays</div></span><span class="lb-score">' + r.best.toLocaleString() + '</span></li>').join('') + '</ol>'
         : '<div class="empty-state" style="padding:32px">' + icon('trophy').replace('<svg', '<svg width="40" height="40" style="margin:0 auto 12px;color:#fcd34d"') + '<p style="margin-bottom:16px">No scores yet for ' + esc(g.title) + '. The top spot is wide open.</p><a class="btn btn-primary" href="' + g.path + '">' + icon('play') + 'Claim it</a></div>';

@@ -20,20 +20,28 @@
   })();
 
   /* ------------------------------------------------------------------------
-     CONFIG — edit these when you set up payments
+     CONFIG — edit these when you set up the backend and payments
      ------------------------------------------------------------------------ */
   const config = {
     siteName: 'Nova Arcade',
     root: ROOT,
+    /* Cloud accounts (Supabase). Paste your project's URL and *anon/publishable*
+       key here (Project Settings → API). Both are safe to ship in the browser —
+       security comes from the row-level-security rules in supabase/setup.sql.
+       Leave empty to fall back to device-only accounts. */
+    cloud: {
+      supabaseUrl: 'https://oazqmjnkkyqwxpsglgcb.supabase.co',
+      supabaseAnonKey: 'sb_publishable_h-I9xAYcRlVRze13k2v40Q_CZ6Rf8C3'
+    },
     pro: {
       available: false,             // flip to true once checkout is wired up
       priceLabel: 'Coming soon',    // e.g. '$4.99 / month'
       checkoutUrl: null,            // e.g. your Stripe Checkout / Payment Link URL
       perks: [
-        'Every Pro-only game as it launches',
+        'Pro-only games like HexGL, Classic 8-Ball and Astray',
         'Premium animated backgrounds',
-        'Exclusive skins and themes in every game',
-        'Cloud-synced progress across devices',
+        'Exclusive skins and modes in every game',
+        'Early access to new games',
         'No ads, ever'
       ]
     }
@@ -42,33 +50,62 @@
   /* ------------------------------------------------------------------------
      GAME REGISTRY — the hub builds its grid from this list.
      status: 'live' | 'soon'   tier: 'free' | 'pro'
-     thumb: key of a thumbnail animation in index.html (or omit for default)
+     Original games: path → their page.  Open-source ports: port → folder in
+     games/ports/, opened through games/play.html. image → cover in
+     games/ports/_thumbs/, thumb → an animated canvas cover in index.html.
      ------------------------------------------------------------------------ */
+  const port = (o) => Object.assign({ status: 'live', path: 'games/play.html?g=' + o.id }, o);
   const games = [
-    { id: 'snake', title: 'Neon Snake', path: 'games/snake.html', tier: 'free', status: 'live',
-      tagline: 'Classic snake with power-ups, combos, skins and three modes.',
+    { id: 'snake', title: 'Neon Snake', path: 'games/snake.html', tier: 'free', status: 'live', original: true,
+      tagline: 'Classic snake with power-ups, combos, skins and four modes.',
       tags: ['Arcade', 'Classic'], hue: 150, thumb: 'snake' },
-    { id: 'blocks', title: 'Block Drop', path: null, tier: 'free', status: 'soon',
-      tagline: 'Stack, clear lines, chase the perfect tetris.', tags: ['Puzzle'], hue: 200, thumb: 'blocks' },
-    { id: 'void', title: 'Void Drift', path: null, tier: 'free', status: 'soon',
-      tagline: 'Blast asteroids in a neon vector galaxy.', tags: ['Shooter'], hue: 280, thumb: 'void' },
-    { id: 'pong', title: 'Neon Pong', path: null, tier: 'pro', status: 'soon',
+    port({ id: '2048', title: '2048', tier: 'free', tags: ['Puzzle'], hue: 35, image: '2048',
+      tagline: 'Slide, merge, and chase the 2048 tile.', author: 'Gabriele Cirulli', license: 'MIT', repo: 'gabrielecirulli/2048', controls: 'Arrow keys / swipe' }),
+    port({ id: 'hextris', title: 'Hextris', tier: 'free', tags: ['Puzzle', 'Arcade'], hue: 205, image: 'hextris',
+      tagline: 'Fast-paced hexagonal Tetris. Rotate to match falling blocks.', author: 'Hextris team', license: 'GPL-3.0', repo: 'Hextris/hextris', controls: 'Left / Right to rotate' }),
+    port({ id: 'clumsy-bird', title: 'Clumsy Bird', tier: 'free', tags: ['Arcade'], hue: 95, image: 'clumsy-bird',
+      tagline: 'Flap through the pipes. One more try, always.', author: 'Ellison Leão', license: 'GPL-3.0', repo: 'ellisonleao/clumsy-bird', controls: 'Space / click to flap' }),
+    port({ id: 'trex', title: 'T-Rex Runner', tier: 'free', tags: ['Arcade', 'Classic'], hue: 0, thumb: 'trex',
+      tagline: 'The famous offline dino, endlessly running.', author: 'wayou (from Chromium)', license: 'BSD-3-Clause', repo: 'wayou/t-rex-runner', controls: 'Space / Up to jump, Down to duck' }),
+    port({ id: 'tetris', title: 'Tetris Classic', tier: 'free', tags: ['Puzzle', 'Classic'], hue: 230, image: 'tetris',
+      tagline: 'Clean, no-frills falling-block puzzling.', author: 'Jake Gordon', license: 'MIT', repo: 'jakesgordon/javascript-tetris', controls: 'Arrows to move/rotate, Space to start' }),
+    port({ id: 'asteroids', title: 'Asteroids', tier: 'free', tags: ['Shooter', 'Classic'], hue: 280, thumb: 'void',
+      tagline: 'Vector-style rock blasting in deep space.', author: 'Doug McInnes', license: 'MIT', repo: 'dmcinnes/HTML5-Asteroids', controls: 'Arrows to fly, Space to shoot' }),
+    port({ id: 'radius-raid', title: 'Radius Raid', tier: 'free', tags: ['Shooter'], hue: 340, image: 'radius-raid',
+      tagline: 'Twin-stick space shooter packed with power-ups.', author: 'Jack Rugile', license: 'MIT', repo: 'jackrugile/radius-raid-js13k', controls: 'WASD to move, mouse to aim & fire' }),
+    port({ id: 'adarkroom', title: 'A Dark Room', tier: 'free', tags: ['Adventure', 'Idle'], hue: 25, thumb: 'darkroom',
+      tagline: 'A minimalist text adventure that grows into something huge.', author: 'Doublespeak Games', license: 'MPL-2.0', repo: 'doublespeakgames/adarkroom', controls: 'Mouse' }),
+    port({ id: 'particle-clicker', title: 'Particle Clicker', tier: 'free', tags: ['Idle'], hue: 15, image: 'particle-clicker',
+      tagline: 'Run a physics lab and discover the universe, one click at a time.', author: 'CERN Webfest team', license: 'MIT', repo: 'particle-clicker/particle-clicker', controls: 'Mouse' }),
+    port({ id: 'hearts', title: 'Hearts', tier: 'free', tags: ['Cards'], hue: 140, image: 'hearts',
+      tagline: 'The classic trick-taking card game against three AI players.', author: 'Yujian Yao', license: 'BSD-2-Clause', repo: 'yyjhao/html5-hearts', controls: 'Mouse' }),
+    port({ id: 'hexgl', title: 'HexGL', tier: 'pro', tags: ['Racing', '3D'], hue: 190, image: 'hexgl',
+      tagline: 'Futuristic anti-gravity racing in full 3D.', author: 'Thibaut Despoulain', license: 'MIT', repo: 'BKcore/HexGL', controls: 'Arrows to steer, A/D to air-brake' }),
+    port({ id: 'pool', title: 'Classic 8-Ball', tier: 'pro', tags: ['Sports'], hue: 120, image: 'pool',
+      tagline: 'Realistic 8-ball pool versus a friend or the computer.', author: 'Chen Shmilovich', license: 'MIT', repo: 'henshmi/Classic-Pool-Game', controls: 'Mouse to aim, hold to power' }),
+    port({ id: 'astray', title: 'Astray', tier: 'pro', tags: ['Puzzle', '3D'], hue: 50, thumb: 'maze',
+      tagline: 'Roll a glowing ball through dark 3D labyrinths.', author: 'Rye Terrell', license: 'Unlicense', repo: 'wwwtyro/Astray', controls: 'Arrow keys / WASD' }),
+    { id: 'pong', title: 'Neon Pong', path: null, tier: 'pro', status: 'soon', original: true,
       tagline: 'Fast paddles, curve shots, local 2-player.', tags: ['Arcade', 'Multiplayer'], hue: 320, thumb: 'pong' },
-    { id: 'bricks', title: 'Brick Storm', path: null, tier: 'pro', status: 'soon',
+    { id: 'bricks', title: 'Brick Storm', path: null, tier: 'pro', status: 'soon', original: true,
       tagline: 'Breakout with multiball chaos and boss levels.', tags: ['Arcade'], hue: 25, thumb: 'bricks' }
   ];
 
   /* ------------------------------------------------------------------------
-     STORAGE
+     STORAGE — localStorage is the fast local cache. When signed in to a cloud
+     account, synced keys are pushed to the backend automatically.
      ------------------------------------------------------------------------ */
+  const SYNCED = /^(scores|settings|opts\.|portsaves)/;
   const store = {
     get(key, fallback) {
       try { const v = localStorage.getItem('nova.' + key); return v == null ? fallback : JSON.parse(v); }
       catch (e) { return fallback; }
     },
     set(key, value) {
-      try { localStorage.setItem('nova.' + key, JSON.stringify(value)); return true; }
+      try { localStorage.setItem('nova.' + key, JSON.stringify(value)); }
       catch (e) { return false; }
+      if (SYNCED.test(key) && typeof cloud !== 'undefined') cloud.schedulePush();
+      return true;
     },
     remove(key) { try { localStorage.removeItem('nova.' + key); } catch (e) {} }
   };
@@ -124,12 +161,89 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   /* ------------------------------------------------------------------------
-     AUTH
-     ⚠ This is a CLIENT-SIDE DEMO: accounts live in this browser's
-     localStorage. It is fine for a free tier / local profiles, but before
-     you take payments, replace these four functions (signUp, logIn, logOut,
-     current) with calls to a real backend (Supabase, Firebase Auth, your own
-     API...). Everything else in the site only talks to this interface.
+     CLOUD (Supabase) — accounts, synced player data, global leaderboards.
+     Everything is protected by row-level security in supabase/setup.sql:
+     players can only read/write their own data and can never change their
+     own plan. When config.cloud is empty the site falls back to device-only
+     accounts (localAuth below).
+     ------------------------------------------------------------------------ */
+  const cloud = {
+    enabled: !!(config.cloud.supabaseUrl && config.cloud.supabaseAnonKey),
+    client: null, user: null, profile: null, _push: 0, _pulling: false,
+    async init() {
+      if (!this.enabled) return;
+      try {
+        let mod = null;
+        for (const src of ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm', 'https://esm.sh/@supabase/supabase-js@2', 'https://unpkg.com/@supabase/supabase-js@2/dist/module/index.js?module']) {
+          try { mod = await import(src); if (mod && mod.createClient) break; } catch (e) { mod = null; }
+        }
+        if (!mod) throw new Error('could not load the Supabase library');
+        this.client = mod.createClient(config.cloud.supabaseUrl, config.cloud.supabaseAnonKey, {
+          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'nova.sb-auth' }
+        });
+      } catch (e) { console.warn('[nova] cloud unavailable, using device accounts', e); this.enabled = false; return; }
+      this.client.auth.onAuthStateChange((evt, session) => {
+        if (evt === 'SIGNED_OUT') { this.user = null; this.profile = null; store.remove('cloudProfile'); emit('auth', null); }
+        if (evt === 'PASSWORD_RECOVERY') setTimeout(() => openResetPassword(), 300);
+      });
+      const { data } = await this.client.auth.getSession();
+      if (data.session) await this._loadUser(data.session.user);
+      else if (store.get('cloudProfile', null)) { store.remove('cloudProfile'); emit('auth', null); }
+    },
+    async _loadUser(user) {
+      this.user = user;
+      const { data: prof, error } = await this.client.from('profiles').select('*').eq('id', user.id).single();
+      if (error) { console.warn('[nova] profile', error); return; }
+      this.profile = prof; store.set('cloudProfile', prof);
+      await this.pull();
+      emit('auth', auth.current());
+    },
+    /* merge server data into the local cache (server wins for settings/options,
+       scores keep the best of both so nothing played offline is lost) */
+    async pull() {
+      if (!this.user) return;
+      this._pulling = true;
+      try {
+        const { data } = await this.client.from('player_data').select('data').eq('user_id', this.user.id).maybeSingle();
+        const remote = (data && data.data) || {};
+        const id = this.user.id, all = store.get('scores', {});
+        const local = all[id] || {}, rs = remote.scores || {};
+        Object.keys(rs).forEach((g) => {
+          const l = local[g], r = rs[g];
+          if (!l) { local[g] = r; return; }
+          local[g] = { best: Math.max(l.best, r.best), plays: Math.max(l.plays, r.plays), total: Math.max(l.total, r.total),
+            time: Math.max(l.time, r.time), history: (l.history.length >= r.history.length ? l.history : r.history) };
+        });
+        all[id] = local; store.set('scores', all);
+        if (remote.settings) { Object.assign(settings._s, remote.settings); store.set('settings', settings._s); applySettings(); bg.applyPage && document.body && bg.applyPage(); }
+        Object.keys(remote.opts || {}).forEach((k) => store.set('opts.' + k, remote.opts[k]));
+        if (remote.portsaves) store.set('portsaves', Object.assign({}, store.get('portsaves', {}), remote.portsaves));
+      } finally { this._pulling = false; }
+      this.schedulePush(10);
+    },
+    schedulePush(delay) {
+      if (!this.user || this._pulling) return;
+      clearTimeout(this._push);
+      this._push = setTimeout(() => this.push(), delay == null ? 1500 : delay);
+    },
+    async push() {
+      if (!this.user) return;
+      const id = this.user.id, opts = {};
+      Object.keys(localStorage).forEach((k) => { if (k.startsWith('nova.opts.')) opts[k.slice(10)] = store.get(k.slice(5), {}); });
+      const scoresMine = (store.get('scores', {})[id]) || {};
+      const payload = { scores: scoresMine, settings: settings._s, opts, portsaves: store.get('portsaves', {}) };
+      const { error } = await this.client.from('player_data').upsert({ user_id: id, data: payload, updated_at: new Date().toISOString() });
+      if (error) console.warn('[nova] sync', error);
+      const rows = Object.entries(scoresMine).filter(([, r]) => r.best > 0).map(([g, r]) => ({ user_id: id, game_id: g, best: r.best, plays: r.plays, updated_at: new Date().toISOString() }));
+      if (rows.length) { const { error: e2 } = await this.client.from('scores').upsert(rows); if (e2) console.warn('[nova] scores', e2); }
+      emit('synced');
+    }
+  };
+  window.addEventListener('pagehide', () => { if (cloud.user) cloud.push(); });
+
+  /* ------------------------------------------------------------------------
+     AUTH — one interface for both modes. Cloud: email + password via
+     Supabase. Device: hashed passwords in localStorage (fallback only).
      ------------------------------------------------------------------------ */
   async function hashPassword(password, salt) {
     if (window.crypto && crypto.subtle) {
@@ -138,15 +252,25 @@
       const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: enc.encode(salt), iterations: 120000, hash: 'SHA-256' }, key, 256);
       return Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, '0')).join('');
     }
-    // Fallback (non-secure contexts): weak but deterministic
-    let h = 2166136261;
-    const s = salt + ':' + password;
+    let h = 2166136261; const s = salt + ':' + password;
     for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
     return 'fnv' + (h >>> 0).toString(16);
   }
-  const randomSalt = () => Array.from((window.crypto || {}).getRandomValues ? crypto.getRandomValues(new Uint8Array(12)) : [Math.random() * 1e9]).map((b) => (b | 0).toString(16)).join('');
+  const randomSalt = () => Array.from(crypto.getRandomValues(new Uint8Array(12))).map((b) => b.toString(16).padStart(2, '0')).join('');
+
+  const friendlyAuthError = (e) => {
+    const m = (e && (e.message || e.msg || String(e))) || '';
+    if (/invalid login credentials/i.test(m)) return 'Email or password is incorrect.';
+    if (/already registered|already exists/i.test(m)) return 'An account with that email already exists. Try logging in.';
+    if (/database error saving new user|reserved|duplicate key/i.test(m)) return 'That username is taken. Try another one.';
+    if (/email not confirmed/i.test(m)) return 'Confirm your email first — check your inbox for the link.';
+    if (/rate limit|too many/i.test(m)) return 'Too many attempts. Wait a minute and try again.';
+    if (/password should be/i.test(m)) return 'Use a stronger password (at least 6 characters).';
+    return m || 'Something went wrong. Try again.';
+  };
 
   const auth = {
+    get mode() { return cloud.enabled ? 'cloud' : 'local'; },
     validateUsername(u) {
       if (!u) return 'Choose a username.';
       if (u.length < 3) return 'Usernames need at least 3 characters.';
@@ -154,79 +278,120 @@
       if (!/^[a-zA-Z0-9_]+$/.test(u)) return 'Letters, numbers and underscores only.';
       return '';
     },
-    validatePassword(p) {
-      if (!p) return 'Enter a password.';
-      if (p.length < 6) return 'Use at least 6 characters.';
-      return '';
+    validatePassword(p) { if (!p) return 'Enter a password.'; if (p.length < 6) return 'Use at least 6 characters.'; return ''; },
+    validateEmail(e) { if (!e) return 'Enter your email.'; if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return 'That doesn’t look like an email address.'; return ''; },
+    async usernameAvailable(u) {
+      if (cloud.enabled) await ready;
+      if (cloud.enabled && cloud.client) { const { data, error } = await cloud.client.rpc('username_available', { u }); return error ? true : !!data; }
+      return !store.get('users', {})[u.toLowerCase()];
     },
-    async signUp(username, password) {
-      const users = store.get('users', {});
-      const key = username.toLowerCase();
+    /* returns { user } or { needsConfirm: true } */
+    async signUp(username, password, email) {
+      if (cloud.enabled) await ready;
+      if (cloud.enabled) {
+        if (!(await auth.usernameAvailable(username))) throw new Error('That username is taken. Try another one.');
+        const { data, error } = await cloud.client.auth.signUp({ email, password, options: { data: { username }, emailRedirectTo: location.origin + location.pathname } });
+        if (error) throw new Error(friendlyAuthError(error));
+        if (!data.session) return { needsConfirm: true };
+        await cloud._loadUser(data.user);
+        return { user: auth.current() };
+      }
+      const users = store.get('users', {}), key = username.toLowerCase();
       if (users[key]) throw new Error('That username is taken on this device.');
       const salt = randomSalt();
       users[key] = { username, salt, hash: await hashPassword(password, salt), created: Date.now(), plan: 'free', hue: Math.floor(Math.random() * 360) };
-      store.set('users', users);
-      store.set('session', { user: key });
-      emit('auth', auth.current());
-      return auth.current();
+      store.set('users', users); store.set('session', { user: key }); emit('auth', auth.current());
+      return { user: auth.current() };
     },
-    async logIn(username, password) {
-      const users = store.get('users', {});
-      const u = users[username.toLowerCase()];
+    async logIn(identifier, password) {
+      if (cloud.enabled) await ready;
+      if (cloud.enabled) {
+        const { data, error } = await cloud.client.auth.signInWithPassword({ email: identifier, password });
+        if (error) throw new Error(friendlyAuthError(error));
+        await cloud._loadUser(data.user);
+        return auth.current();
+      }
+      const u = store.get('users', {})[identifier.toLowerCase()];
       if (!u || (await hashPassword(password, u.salt)) !== u.hash) throw new Error('Username or password is incorrect.');
-      store.set('session', { user: username.toLowerCase() });
-      emit('auth', auth.current());
+      store.set('session', { user: identifier.toLowerCase() }); emit('auth', auth.current());
       return auth.current();
     },
-    logOut() { store.remove('session'); emit('auth', null); },
+    async resetPassword(email) {
+      await ready;
+      const { error } = await cloud.client.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+      if (error) throw new Error(friendlyAuthError(error));
+    },
+    async updatePassword(pw) {
+      const { error } = await cloud.client.auth.updateUser({ password: pw });
+      if (error) throw new Error(friendlyAuthError(error));
+    },
+    async logOut() {
+      if (cloud.enabled && cloud.user) { await cloud.push(); await cloud.client.auth.signOut(); }
+      store.remove('session'); store.remove('cloudProfile'); emit('auth', null);
+    },
     current() {
-      const s = store.get('session', null);
-      if (!s) return null;
+      if (cloud.enabled) {
+        const p = cloud.profile || store.get('cloudProfile', null);
+        return p ? { id: p.id, username: p.username, created: Date.parse(p.created_at), plan: p.plan, role: p.role, hue: p.hue, cloud: true } : null;
+      }
+      const s = store.get('session', null); if (!s) return null;
       const u = store.get('users', {})[s.user];
       return u ? { id: s.user, username: u.username, created: u.created, plan: u.plan, hue: u.hue } : null;
     },
-    isPro() { const u = auth.current(); return !!(u && u.plan === 'pro'); },
-    /* Call this from your payment webhook / success page once real billing exists */
-    _setPlan(plan) {
-      const s = store.get('session', null); if (!s) return;
-      const users = store.get('users', {}); if (!users[s.user]) return;
-      users[s.user].plan = plan; store.set('users', users); emit('auth', auth.current());
-    }
+    /* Pro is decided by the server (profiles.plan), never by the client */
+    isPro() { const u = auth.current(); return !!(u && (u.plan === 'pro' || u.role === 'owner')); },
+    isOwner() { const u = auth.current(); return !!(u && u.role === 'owner'); }
   };
 
   /* ------------------------------------------------------------------------
      SCORES & STATS
      ------------------------------------------------------------------------ */
+  const blankRec = () => ({ best: 0, plays: 0, total: 0, time: 0, history: [] });
   const scores = {
     _key() { const u = auth.current(); return u ? u.id : '__guest'; },
     _all() { return store.get('scores', {}); },
-    get(gameId) {
-      const rec = (this._all()[this._key()] || {})[gameId];
-      return rec || { best: 0, plays: 0, total: 0, time: 0, history: [] };
-    },
+    get(gameId) { return (this._all()[this._key()] || {})[gameId] || blankRec(); },
     best(gameId) { return this.get(gameId).best; },
-    submit(gameId, score, extra) {
-      const all = this._all(); const k = this._key();
-      all[k] = all[k] || {};
-      const r = all[k][gameId] || { best: 0, plays: 0, total: 0, time: 0, history: [] };
-      const isRecord = score > r.best, previousBest = r.best;
-      r.plays++; r.total += score; r.time += (extra && extra.seconds) || 0;
-      if (isRecord) r.best = score;
-      r.history.unshift({ score, at: Date.now(), mode: extra && extra.mode });
-      r.history = r.history.slice(0, 15);
-      all[k][gameId] = r; store.set('scores', all);
-      emit('score', { gameId, score, isRecord });
-      return { isRecord, best: r.best, previousBest };
+    _write(gameId, fn) {
+      const all = this._all(), k = this._key();
+      all[k] = all[k] || {}; const r = all[k][gameId] || blankRec();
+      const out = fn(r); all[k][gameId] = r; store.set('scores', all); return out;
     },
-    /* leaderboard across every profile on this device */
+    submit(gameId, score, extra) {
+      const res = this._write(gameId, (r) => {
+        const isRecord = score > r.best, previousBest = r.best;
+        r.plays++; r.total += score; r.time += (extra && extra.seconds) || 0;
+        if (isRecord) r.best = score;
+        r.history.unshift({ score, at: Date.now(), mode: extra && extra.mode });
+        r.history = r.history.slice(0, 15);
+        return { isRecord, best: r.best, previousBest };
+      });
+      emit('score', { gameId, score, isRecord: res.isRecord });
+      return res;
+    },
+    /* for games without a score (ports): count the play and time spent */
+    recordPlay(gameId, seconds) {
+      this._write(gameId, (r) => { r.plays++; r.time += seconds || 0; r.history.unshift({ score: 0, at: Date.now(), mode: 'Session · ' + Math.round(seconds || 0) + 's' }); r.history = r.history.slice(0, 15); });
+    },
+    addTime(gameId, seconds) { this._write(gameId, (r) => { r.time += seconds; }); },
+    /* device leaderboard (instant) */
     leaderboard(gameId, limit) {
-      const all = this._all(); const users = store.get('users', {});
+      const all = this._all(), users = store.get('users', {}), me = this._key(), prof = store.get('cloudProfile', null);
       const rows = [];
       Object.keys(all).forEach((k) => {
         const r = all[k][gameId]; if (!r || !r.best) return;
-        rows.push({ name: k === '__guest' ? 'Guest' : (users[k] ? users[k].username : k), best: r.best, plays: r.plays, hue: users[k] ? users[k].hue : 220, me: k === this._key() });
+        const name = k === '__guest' ? 'Guest' : users[k] ? users[k].username : (prof && prof.id === k ? prof.username : 'Player');
+        rows.push({ name, best: r.best, plays: r.plays, hue: users[k] ? users[k].hue : (prof && prof.id === k ? prof.hue : 220), me: k === me });
       });
       return rows.sort((a, b) => b.best - a.best).slice(0, limit || 10);
+    },
+    /* global leaderboard when cloud is on, device board otherwise */
+    async leaderboardAsync(gameId, limit) {
+      if (!cloud.enabled || !cloud.client) return { scope: 'device', rows: this.leaderboard(gameId, limit) };
+      const { data, error } = await cloud.client.from('leaderboard').select('username,hue,best,plays,user_id').eq('game_id', gameId).order('best', { ascending: false }).limit(limit || 10);
+      if (error) return { scope: 'device', rows: this.leaderboard(gameId, limit) };
+      const me = cloud.user && cloud.user.id;
+      return { scope: 'global', rows: data.map((r) => ({ name: r.username, hue: r.hue, best: Number(r.best), plays: r.plays, me: r.user_id === me })) };
     },
     summary() {
       const mine = this._all()[this._key()] || {};
@@ -444,7 +609,7 @@
     /* Browsers block audio until a user gesture — unlock on first interaction */
     function unlock() {
       const c = ensure(); if (!c) return;
-      const go = () => { if (settings.get('music')) music.start(); };
+      const go = () => { if (settings.get('music') && !document.documentElement.hasAttribute('data-no-music')) music.start(); };
       if (c.state === 'suspended') c.resume().then(go); else go();
     }
     ['pointerdown', 'keydown', 'touchstart'].forEach((ev) => window.addEventListener(ev, function once() {
@@ -813,51 +978,92 @@
   /* ---- Auth modal ---- */
   function openAuth(mode) {
     mode = mode || 'login';
+    const isCloud = auth.mode === 'cloud';
+    const lockIco = icon('lock').replace('<svg', '<svg style="display:inline;width:13px;height:13px;vertical-align:-2px"');
     const m = modal(
-      '<h2 id="auth-title">Welcome, player</h2><p class="modal-sub">Save high scores, stats and settings to your profile.</p>' +
+      '<h2 id="auth-title">Welcome, player</h2><p class="modal-sub">' + (isCloud ? 'Your scores, settings and saves follow you to every device.' : 'Save high scores, stats and settings to your profile.') + '</p>' +
       '<div class="tabs" role="tablist"><button class="tab" role="tab" data-mode="login">Log in</button><button class="tab" role="tab" data-mode="signup">Create account</button></div>' +
       '<form novalidate class="auth-form" style="display:grid;gap:14px">' +
-      '<div class="field"><label for="au-user">Username</label><input class="input" id="au-user" name="username" autocomplete="username" autofocus maxlength="18"><div class="field-error" id="au-user-err"></div></div>' +
-      '<div class="field"><label for="au-pass">Password</label><input class="input" id="au-pass" name="password" type="password" autocomplete="current-password"><div class="field-error" id="au-pass-err"></div></div>' +
+      '<div class="field au-uname"><label for="au-user">Username</label><input class="input" id="au-user" autocomplete="username" maxlength="18" spellcheck="false"><div class="field-hint au-uhint">Shown on leaderboards. Letters, numbers, underscores.</div><div class="field-error" id="au-user-err"></div></div>' +
+      (isCloud ? '<div class="field au-email"><label for="au-email">Email</label><input class="input" id="au-email" type="email" autocomplete="email" spellcheck="false"><div class="field-error" id="au-email-err"></div></div>' : '') +
+      '<div class="field"><div style="display:flex;justify-content:space-between;align-items:baseline"><label for="au-pass">Password</label>' + (isCloud ? '<a href="#" class="au-forgot" style="font-size:13px">Forgot password?</a>' : '') + '</div><input class="input" id="au-pass" type="password" autocomplete="current-password"><div class="field-error" id="au-pass-err"></div></div>' +
       '<div class="field au-confirm" hidden><label for="au-pass2">Confirm password</label><input class="input" id="au-pass2" type="password" autocomplete="new-password"><div class="field-error" id="au-pass2-err"></div></div>' +
       '<div class="field-error au-form-err" role="alert"></div>' +
       '<button class="btn btn-primary btn-lg btn-block au-submit" type="submit">Log in</button>' +
       '<button class="btn btn-ghost btn-block au-guest" type="button">Keep playing as guest</button>' +
-      '<p class="field-hint" style="text-align:center">Free accounts are stored on this device. ' + icon('lock', '') .replace('class=""', 'style="display:inline;width:13px;height:13px;vertical-align:-2px"') + ' Passwords are hashed.</p>' +
+      '<p class="field-hint" style="text-align:center">' + lockIco + (isCloud ? ' Secured cloud account. We never see your password.' : ' Accounts are stored on this device. Passwords are hashed.') + '</p>' +
       '</form>', { label: 'Log in or create account' });
     const box = m.el, form = box.querySelector('form');
+    const q = (sel) => box.querySelector(sel);
     const setMode = (md) => {
       mode = md;
       box.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.mode === md)));
-      box.querySelector('.au-confirm').hidden = md !== 'signup';
-      box.querySelector('.au-submit').textContent = md === 'signup' ? 'Create free account' : 'Log in';
-      box.querySelector('#au-pass').autocomplete = md === 'signup' ? 'new-password' : 'current-password';
-      box.querySelector('#auth-title').textContent = md === 'signup' ? 'Join the arcade' : 'Welcome back';
+      q('.au-confirm').hidden = md !== 'signup';
+      if (isCloud) q('.au-uname').hidden = md !== 'signup';
+      q('.au-uhint').hidden = md !== 'signup';
+      q('.au-submit').textContent = md === 'signup' ? 'Create free account' : 'Log in';
+      q('#au-pass').autocomplete = md === 'signup' ? 'new-password' : 'current-password';
+      q('#auth-title').textContent = md === 'signup' ? 'Join the arcade' : 'Welcome back';
+      if (q('.au-forgot')) q('.au-forgot').hidden = md === 'signup';
       box.querySelectorAll('.field-error').forEach((e) => (e.textContent = ''));
+      setTimeout(() => { const f = isCloud && md === 'login' ? q('#au-email') : q('#au-user'); f && f.focus(); }, 30);
     };
     box.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => { audio.sfx('click'); setMode(t.dataset.mode); }));
     setMode(mode);
-    const setErr = (id, msg) => { const i = box.querySelector('#' + id); const e = box.querySelector('#' + id + '-err'); e.textContent = msg; i.setAttribute('aria-invalid', msg ? 'true' : 'false'); };
-    box.querySelector('#au-user').addEventListener('blur', (e) => { if (mode === 'signup' && e.target.value) setErr('au-user', auth.validateUsername(e.target.value.trim())); });
+    const setErr = (id, msg) => { const i = q('#' + id), e = q('#' + id + '-err'); if (!i) return; e.textContent = msg; i.setAttribute('aria-invalid', msg ? 'true' : 'false'); };
+    q('#au-user').addEventListener('blur', async (e) => {
+      const v = e.target.value.trim(); if (mode !== 'signup' || !v) return;
+      const err = auth.validateUsername(v); setErr('au-user', err);
+      if (!err && !(await auth.usernameAvailable(v))) setErr('au-user', 'That username is taken.');
+    });
+    if (q('.au-forgot')) q('.au-forgot').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const email = q('#au-email').value.trim(), ee = auth.validateEmail(email);
+      if (ee) { setErr('au-email', 'Enter your email above, then tap “Forgot password?”'); return; }
+      try { await auth.resetPassword(email); toast('Check your email for a reset link.', 'bell'); m.close(); }
+      catch (err) { q('.au-form-err').textContent = err.message; }
+    });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const u = box.querySelector('#au-user').value.trim(), p = box.querySelector('#au-pass').value, p2 = box.querySelector('#au-pass2').value;
-      const ue = mode === 'signup' ? auth.validateUsername(u) : (u ? '' : 'Enter your username.');
-      const pe = mode === 'signup' ? auth.validatePassword(p) : (p ? '' : 'Enter your password.');
-      const ce = mode === 'signup' && p !== p2 ? 'Passwords don’t match.' : '';
-      setErr('au-user', ue); setErr('au-pass', pe); if (mode === 'signup') setErr('au-pass2', ce);
-      if (ue || pe || ce) { audio.sfx('error'); return; }
-      const btn = box.querySelector('.au-submit'); btn.disabled = true; btn.textContent = 'One sec…';
+      const u = q('#au-user').value.trim(), p = q('#au-pass').value, p2 = q('#au-pass2').value, em = isCloud ? q('#au-email').value.trim() : '';
+      const signup = mode === 'signup';
+      const ue = signup ? auth.validateUsername(u) : (!isCloud && !u ? 'Enter your username.' : '');
+      const ee = isCloud ? auth.validateEmail(em) : '';
+      const pe = signup ? auth.validatePassword(p) : (p ? '' : 'Enter your password.');
+      const ce = signup && p !== p2 ? 'Passwords don’t match.' : '';
+      setErr('au-user', ue); if (isCloud) setErr('au-email', ee); setErr('au-pass', pe); if (signup) setErr('au-pass2', ce);
+      q('.au-form-err').textContent = '';
+      if (ue || ee || pe || ce) { audio.sfx('error'); return; }
+      const btn = q('.au-submit'); btn.disabled = true; btn.textContent = 'One sec…';
       try {
-        const user = mode === 'signup' ? await auth.signUp(u, p) : await auth.logIn(u, p);
-        audio.sfx('levelup'); m.close();
-        toast(mode === 'signup' ? 'Account created — welcome, ' + user.username + '!' : 'Welcome back, ' + user.username + '!', 'star');
+        if (signup) {
+          const res = await auth.signUp(u, p, em);
+          if (res.needsConfirm) {
+            audio.sfx('coin'); m.close();
+            modal('<h2>Check your email</h2><p class="modal-sub">We sent a confirmation link to <b>' + esc(em) + '</b>. Click it and you’ll be signed in as <b>' + esc(u) + '</b>.</p><p class="field-hint">No email after a minute? Check spam, or try logging in — your account may already be active.</p>', { label: 'Confirm your email' });
+            return;
+          }
+          audio.sfx('levelup'); m.close(); toast('Account created — welcome, ' + res.user.username + '!', 'star');
+        } else {
+          const user = await auth.logIn(isCloud ? em : u, p);
+          audio.sfx('levelup'); m.close(); toast('Welcome back, ' + user.username + '!' + (auth.isOwner() ? ' Owner mode on.' : ''), 'star');
+        }
       } catch (err) {
-        audio.sfx('error'); box.querySelector('.au-form-err').textContent = err.message;
-        btn.disabled = false; btn.textContent = mode === 'signup' ? 'Create free account' : 'Log in';
+        audio.sfx('error'); q('.au-form-err').textContent = err.message;
+        btn.disabled = false; btn.textContent = signup ? 'Create free account' : 'Log in';
       }
     });
-    box.querySelector('.au-guest').addEventListener('click', () => { audio.sfx('click'); m.close(); });
+    q('.au-guest').addEventListener('click', () => { audio.sfx('click'); m.close(); });
+  }
+
+  /* After clicking a password-reset email link */
+  function openResetPassword() {
+    const m = modal('<h2>Choose a new password</h2><p class="modal-sub">You’re almost back in.</p><form novalidate style="display:grid;gap:14px"><div class="field"><label for="rp-1">New password</label><input class="input" id="rp-1" type="password" autocomplete="new-password" autofocus></div><div class="field-error rp-err" role="alert"></div><button class="btn btn-primary btn-lg btn-block" type="submit">Save password</button></form>', { label: 'Reset password' });
+    m.el.querySelector('form').addEventListener('submit', async (e) => {
+      e.preventDefault(); const v = m.el.querySelector('#rp-1').value, err = auth.validatePassword(v);
+      if (err) { m.el.querySelector('.rp-err').textContent = err; return; }
+      try { await auth.updatePassword(v); m.close(); toast('Password updated.', 'check'); } catch (x) { m.el.querySelector('.rp-err').textContent = x.message; }
+    });
   }
 
   /* ---- Upgrade modal ---- */
@@ -896,13 +1102,13 @@
     modal(
       '<div style="display:flex;align-items:center;gap:16px;margin-bottom:22px">' +
       '<div class="avatar" style="width:64px;height:64px;font-size:26px;border-radius:18px;background:linear-gradient(135deg,hsl(' + u.hue + ',80%,60%),hsl(' + (u.hue + 60) + ',80%,55%))">' + esc(u.username[0].toUpperCase()) + '</div>' +
-      '<div><h2 style="margin:0">' + esc(u.username) + '</h2><div style="display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap"><span class="badge ' + (u.plan === 'pro' ? 'badge-pro' : 'badge-free') + '">' + (u.plan === 'pro' ? 'Pro' : 'Free plan') + '</span><span class="field-hint">Joined ' + new Date(u.created).toLocaleDateString() + '</span></div></div></div>' +
+      '<div><h2 style="margin:0">' + esc(u.username) + '</h2><div style="display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap"><span class="badge ' + (auth.isPro() ? 'badge-pro' : 'badge-free') + '">' + (auth.isOwner() ? 'Owner · Pro' : auth.isPro() ? 'Pro' : 'Free plan') + '</span><span class="badge">' + icon(u.cloud ? 'cloud' : 'phone') + (u.cloud ? 'Synced' : 'This device') + '</span><span class="field-hint">Joined ' + new Date(u.created).toLocaleDateString() + '</span></div></div></div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px">' +
       '<div class="glass" style="padding:16px"><div class="field-hint">Games played</div><div style="font-family:var(--font-display);font-size:28px">' + sum.plays + '</div></div>' +
       '<div class="glass" style="padding:16px"><div class="field-hint">Time played</div><div style="font-family:var(--font-display);font-size:28px">' + fmtTime(sum.time) + '</div></div></div>' +
       '<h3 style="font-family:var(--font-ui);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-faint);margin-bottom:10px">Personal bests</h3>' +
       '<div style="display:grid;gap:8px">' + (rows || '<p class="field-hint">No games yet.</p>') + '</div>' +
-      (u.plan !== 'pro' ? '<button class="btn btn-accent btn-block pf-up" style="margin-top:20px">' + icon('crown') + 'See Pro perks</button>' : ''),
+      (!auth.isPro() ? '<button class="btn btn-accent btn-block pf-up" style="margin-top:20px">' + icon('crown') + 'See Pro perks</button>' : ''),
       { label: 'Your profile' });
     const up = document.querySelector('.pf-up'); if (up) up.addEventListener('click', () => openUpgrade());
   }
@@ -1003,13 +1209,14 @@
      BOOT
      ------------------------------------------------------------------------ */
   applySettings();
+  const ready = cloud.init();
   const boot = () => bg.applyPage();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
   on('auth', () => bg.applyPage());
 
   window.Arcade = {
-    config, games, store, auth, scores, settings, audio, bg, icon, esc, on, emit,
-    ui: { toast, modal, openAuth, openUpgrade, openProfile, openSettings, bindMusicButton, el, fmtTime },
+    config, games, store, auth, scores, settings, audio, bg, icon, esc, on, emit, cloud, ready,
+    ui: { toast, modal, openAuth, openResetPassword, openUpgrade, openProfile, openSettings, bindMusicButton, el, fmtTime },
     url: (p) => ROOT + p
   };
 })();
